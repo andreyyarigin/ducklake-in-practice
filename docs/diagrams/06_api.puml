@@ -1,0 +1,223 @@
+@startuml api
+skinparam backgroundColor #FAFAFA
+skinparam defaultFontName "DejaVu Sans"
+skinparam defaultFontSize 11
+
+hide circle
+
+skinparam class {
+  BackgroundColor #FEFCE8
+  BorderColor #374151
+  HeaderBackgroundColor #FEF08A
+  HeaderFontColor #111827
+  FontColor #111827
+  BorderThickness 1.5
+  AttributeFontSize 10
+}
+skinparam classHeader {
+  FontColor #111827
+  FontStyle bold
+}
+skinparam note {
+  BackgroundColor #FFFBEB
+  BorderColor #D97706
+  FontColor #78350F
+  FontSize 10
+}
+skinparam package {
+  BorderColor #6366F1
+  BackgroundColor #EEF2FF
+  FontColor #111827
+}
+
+title <b>ducklake-in-practice — FastAPI</b>\n<size:11>Эндпоинты и источники данных</size>
+
+package "GET /health, GET /" as health_pkg {
+  class "Health Check" as health {
+    GET /health
+    --
+    status : "ok" | "error"
+    ducklake : "connected" | "unavailable"
+    flights_count : int
+    timestamp : datetime
+  }
+  note right of health
+    Проверяет DuckLake ATTACH
+    и COUNT(*) FROM flights.flights
+  end note
+}
+
+package "Router: /routes" as routes_pkg {
+  class "Route Endpoints" as routes {
+    GET /routes
+    GET /routes/top
+    GET /routes/{route_key}/daily
+    GET /routes/{route_key}/weekly
+  }
+
+  class "GET /routes" as r1 {
+    Response: RouteInfo[]
+    --
+    route_key : str
+    route_name : str
+    src_airport_iata : str
+    dst_airport_iata : str
+    --
+    Source: mart_route_daily (DISTINCT)
+  }
+
+  class "GET /routes/top" as r2 {
+    Params: limit=10, date_from, date_to
+    Response: RouteTopItem[]
+    --
+    route_key : str
+    total_revenue : float
+    total_bookings : int
+    total_flights : int
+    avg_load_factor_pct : float
+    --
+    Source: mart_route_daily (GROUP BY)
+  }
+
+  class "GET /routes/{key}/daily" as r3 {
+    Params: date_from, date_to
+    Response: RouteDailyMetrics[]
+    --
+    flight_date : date
+    total_flights : int
+    cancelled_flights : int
+    delayed_flights : int
+    avg_delay_min : float
+    total_bookings : int
+    total_revenue : float
+    load_factor_pct : float
+    --
+    Source: mart_route_daily (WHERE)
+  }
+
+  class "GET /routes/{key}/weekly" as r4 {
+    Params: date_from, date_to
+    Response: dict[]
+    --
+    week_start : date
+    total_flights : int
+    total_bookings : int
+    total_revenue : float
+    load_factor_pct : float
+    cancellation_rate_pct : float
+    --
+    Source: mart_route_weekly (WHERE)
+  }
+}
+
+package "Router: /airlines" as airlines_pkg {
+  class "Airline Endpoints" as airlines {
+    GET /airlines
+    GET /airlines/stats
+    GET /airlines/{iata}/daily
+  }
+
+  class "GET /airlines" as a1 {
+    Response: AirlineInfo[]
+    --
+    iata_code : str
+    name : str
+    country : str
+    --
+    Source: flights.airlines
+    WHERE active=true
+    ORDER BY name
+  }
+
+  class "GET /airlines/stats" as a2 {
+    Params: limit=20, date_from, date_to
+    Response: AirlineStats[]
+    --
+    airline_iata : str
+    total_flights : int
+    cancelled_flights : int
+    avg_delay_min : float
+    total_revenue : float
+    avg_load_factor_pct : float
+    cancellation_rate_pct : float
+    --
+    Source: mart_airline_daily (GROUP BY)
+    ORDER BY total_revenue DESC
+  }
+
+  class "GET /airlines/{iata}/daily" as a3 {
+    Params: date_from, date_to
+    Response: AirlineDailyMetrics[]
+    --
+    flight_date : date
+    total_flights : int
+    active_routes : int
+    total_bookings : int
+    total_revenue : float
+    load_factor_pct : float
+    --
+    Source: mart_airline_daily (WHERE)
+  }
+}
+
+package "Router: /time-travel  ★ DuckLake feature" as tt_pkg {
+  class "Time Travel Endpoints" as tt {
+    GET /time-travel/snapshots
+    GET /time-travel/compare
+    GET /time-travel/pricing-curves
+    GET /time-travel/price-history/{flight_id}
+  }
+
+  class "GET /time-travel/snapshots" as t1 {
+    Params: limit=20
+    Response: SnapshotInfo[]
+    --
+    snapshot_id : int
+    created_at : datetime
+    schema_version : int
+    --
+    Source: ducklake_snapshots('flights')
+    (DuckLake catalog function)
+  }
+
+  class "GET /time-travel/compare" as t2 {
+    Params: snapshot_a*, snapshot_b*,\n        route_key
+    Response: SnapshotCompareResult[]
+    --
+    metric : str
+    snapshot_a : float
+    snapshot_b : float
+    diff : float
+    diff_pct : float
+    --
+    Metrics: total_bookings, total_revenue,\ntotal_flights, avg_load_factor,\ncancelled_flights
+    Source: mart_route_daily\n  AT (VERSION => snapshot_id)
+  }
+
+  class "GET /time-travel/pricing-curves" as t3 {
+    Params: route_key*, fare_class=economy
+    Response: dict[]
+    --
+    days_bucket : str
+    avg_price_rub : float
+    min_price_rub : float
+    max_price_rub : float
+    median_price_rub : float
+    price_observations : int
+    --
+    Source: mart_pricing_analysis
+  }
+
+  class "GET /time-travel/price-history/{id}" as t4 {
+    Response: PricePoint[]
+    --
+    recorded_at : datetime
+    fare_class : str
+    price_rub : float
+    days_before_departure : int
+    --
+    Source: flights.price_history (raw)
+  }
+}
+
+@enduml

@@ -1,0 +1,98 @@
+version: 2
+
+sources:
+  - name: raw
+    database: flights
+    schema: main
+    description: "Сырые таблицы DuckLake — seed-данные и генерируемые транзакции"
+    tables:
+      - name: airports
+        description: "Аэропорты РФ (OpenFlights seed)"
+        columns:
+          - name: airport_id
+            description: "PK, OpenFlights ID"
+          - name: iata_code
+            description: "IATA-код аэропорта"
+          - name: country
+            description: "Страна (всегда Russia)"
+
+      - name: airlines
+        description: "Авиакомпании РФ (OpenFlights seed)"
+        columns:
+          - name: airline_id
+            description: "PK"
+          - name: iata_code
+            description: "IATA-код авиакомпании"
+
+      - name: routes
+        description: "Внутренние маршруты РФ (OpenFlights seed)"
+
+      - name: flights
+        description: "Рейсы — генерируются ежедневно"
+        columns:
+          - name: flight_id
+            description: "PK, UUID"
+          - name: flight_date
+            description: "Дата рейса (partition key)"
+
+      - name: bookings
+        description: "Бронирования — генерируются ежечасно"
+        columns:
+          - name: booking_id
+            description: "PK, UUID"
+
+      - name: passengers
+        description: "Пассажиры"
+        columns:
+          - name: passenger_id
+            description: "PK, UUID"
+
+      - name: price_history
+        description: "История цен по рейсам"
+        columns:
+          - name: price_id
+            description: "PK, UUID"
+
+      - name: aircraft_types
+        description: "Справочник типов воздушных судов (seed: характеристики ВС)"
+        columns:
+          - name: icao_code
+            description: "ICAO-код типа ВС (PK)"
+          - name: manufacturer
+            description: "Производитель (Airbus, Boeing, Sukhoi, ...)"
+          - name: seats_total
+            description: "Общее кол-во мест"
+          - name: range_km
+            description: "Максимальная дальность полёта, км"
+          - name: fuel_burn_kg_per_km
+            description: "Средний расход топлива, кг/км"
+
+      - name: weather_observations
+        description: "Дневные погодные наблюдения по аэропортам (Open-Meteo)"
+        columns:
+          - name: observation_id
+            description: "PK, UUID"
+          - name: airport_iata
+            description: "IATA-код аэропорта"
+          - name: observation_date
+            description: "Дата наблюдения (partition key)"
+          - name: weather_code
+            description: "WMO weather code"
+          - name: adverse_conditions
+            description: "Флаг: неблагоприятные погодные условия"
+
+      - name: route_profiles
+        description: "Профили маршрутов — реалистичные характеристики для генерации данных"
+        columns:
+          - name: src_iata
+            description: "IATA-код аэропорта вылета"
+          - name: dst_iata
+            description: "IATA-код аэропорта назначения"
+          - name: base_load_factor
+            description: "Базовый коэффициент загрузки (0.45–0.88)"
+          - name: price_tier
+            description: "Ценовой уровень: budget / medium / premium"
+          - name: seasonality_type
+            description: "Тип сезонности: low / high_summer"
+          - name: competition_level
+            description: "Уровень конкуренции: low / medium / high"

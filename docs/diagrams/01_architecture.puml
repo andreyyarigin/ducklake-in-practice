@@ -1,0 +1,53 @@
+@startwbs architecture
+skinparam backgroundColor #FAFAFA
+skinparam defaultFontName "DejaVu Sans"
+skinparam defaultFontSize 11
+
+<style>
+wbsDiagram {
+  node {
+    BackgroundColor #FEFCE8
+    LineColor #374151
+    FontColor #111827
+    FontSize 10
+    RoundCorner 6
+  }
+  rootNode {
+    BackgroundColor #1E293B
+    LineColor #0F172A
+    FontColor #FFFFFF
+    FontStyle bold
+    FontSize 13
+  }
+  :depth(1) {
+    FontStyle bold
+    FontSize 11
+  }
+}
+</style>
+
+title <b>ducklake-in-practice — Архитектура (слои)</b>
+
++[#1E293B] ducklake-in-practice
+++[#4F46E5] [1] Оркестрация\nAirflow + Redis · Docker Compose
++++[#C7D2FE] Airflow Webserver :8080
++++[#C7D2FE] Airflow Scheduler\nDAG state → PostgreSQL
++++[#FDE68A] Redis :6379\nCelery Broker
++++[#C7D2FE] Celery Worker 1\ningest (flights, bookings, weather) + dbt
++++[#C7D2FE] Celery Worker 2\ningest bookings (parallel)
+++[#EA580C] [2] DuckLake — Source of Truth\nParquet + PostgreSQL каталог
++++[#FED7AA] PostgreSQL :5433\nducklake_catalog\nairflow_metadata · superset_appdb
++++[#FED7AA] MinIO / rustfs :9000\ns3://ducklake-flights/\nParquet · partition: flight_date\n~500 MB/day
+++[#16A34A] [3] Трансформация — dbt\n02:00 UTC · dbt-duckdb + is_ducklake: true
++++[#86EFAC] staging · 10 моделей\ntype casts + dedup + filters
++++[#86EFAC] intermediate · 4 модели\nenrichment + joins · 7.8M → 71K
++++[#86EFAC] marts · 10 моделей\nbusiness metrics
+++[#0284C7] [4] Serving Store\n03:00 UTC · atomic export
++++[#BAE6FD] /serving/flights.duckdb\nREAD marts → WRITE tmp → RENAME
+++[#9333EA] [5] Clients
++++[#E9D5FF] FastAPI :8000\nDuckDB in-process\n/routes · /airlines · /time-travel
++++[#E9D5FF] Superset :8088\nduckdb-engine · 13 чартов
+++[#CA8A04] External
++++[#FEF08A] Open-Meteo API\nweather · free\nHTTP fetch 01:00 UTC
+
+@endwbs

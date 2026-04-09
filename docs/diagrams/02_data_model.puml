@@ -1,0 +1,247 @@
+@startuml data_model
+skinparam backgroundColor #FAFAFA
+skinparam defaultFontName "DejaVu Sans"
+skinparam defaultFontSize 11
+
+hide circle
+
+skinparam class {
+  BackgroundColor #FEFCE8
+  BorderColor #374151
+  HeaderBackgroundColor #FEF08A
+  HeaderFontColor #111827
+  FontColor #111827
+  BorderThickness 1.5
+  AttributeFontSize 10
+}
+skinparam classHeader {
+  FontColor #111827
+  FontStyle bold
+}
+skinparam note {
+  BackgroundColor #FEFCE8
+  BorderColor #A3A3A3
+  FontColor #111827
+  FontSize 10
+}
+skinparam package {
+  FontColor #111827
+}
+
+title <b>ducklake-in-practice — Модель данных</b>\n<size:11>DuckLake schema: flights · цвет стрелки = группа связей</size>
+
+' ════════════════════════════════════════════════
+' РЯД 1: центральный хаб — airports и airlines
+' ════════════════════════════════════════════════
+together {
+  class airports {
+    <b>iata_code</b> : VARCHAR(3) <<PK>>
+    --
+    icao_code : VARCHAR(4)
+    name : VARCHAR
+    city : VARCHAR
+    country : VARCHAR
+    latitude : DOUBLE
+    longitude : DOUBLE
+    altitude : INTEGER
+    timezone_offset : DOUBLE
+    timezone_name : VARCHAR
+  }
+
+  class airlines {
+    <b>airline_id</b> : INTEGER <<PK>>
+    --
+    iata_code : VARCHAR(2) <<unique>>
+    icao_code : VARCHAR(3)
+    name : VARCHAR
+    country : VARCHAR
+    active : BOOLEAN
+  }
+}
+
+' ════════════════════════════════════════════════
+' РЯД 2: справочники второго уровня
+' ════════════════════════════════════════════════
+together {
+  class aircraft_types {
+    <b>icao_code</b> : VARCHAR(4) <<PK>>
+    --
+    iata_code : VARCHAR(3)
+    manufacturer : VARCHAR
+    model : VARCHAR
+    family : VARCHAR
+    seats_economy : INTEGER
+    seats_business : INTEGER
+    seats_first : INTEGER
+    seats_total : INTEGER
+    range_km : INTEGER
+    fuel_burn_kg_per_km : DOUBLE
+  }
+
+  class route_profiles {
+    <b>route_key</b> : VARCHAR <<PK>>
+    --
+    src_airport_iata : VARCHAR(3)
+    dst_airport_iata : VARCHAR(3)
+    base_load_factor : DOUBLE
+    price_tier : VARCHAR
+    seasonality_type : VARCHAR
+    competition_level : VARCHAR
+  }
+
+  class routes {
+    <b>airline_iata</b> : VARCHAR(2) <<FK → airlines>>
+    <b>src_airport_iata</b> : VARCHAR(3) <<FK → airports>>
+    <b>dst_airport_iata</b> : VARCHAR(3) <<FK → airports>>
+    --
+    codeshare : BOOLEAN
+    stops : INTEGER
+    equipment : VARCHAR
+  }
+}
+
+' ════════════════════════════════════════════════
+' РЯД 3: главная транзакционная таблица
+' ════════════════════════════════════════════════
+class flights {
+  <b>flight_id</b> : VARCHAR <<PK, UUID>>
+  <b>flight_date</b> : DATE <<partition>>
+  --
+  flight_number : VARCHAR
+  airline_iata : VARCHAR(2) <<FK → airlines>>
+  src_airport_iata : VARCHAR(3) <<FK → airports>>
+  dst_airport_iata : VARCHAR(3) <<FK → airports>>
+  aircraft_type : VARCHAR(4) <<FK → aircraft_types>>
+  scheduled_departure : TIMESTAMP
+  scheduled_arrival : TIMESTAMP
+  actual_departure : TIMESTAMP
+  actual_arrival : TIMESTAMP
+  status : VARCHAR
+  total_seats : INTEGER
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+' ════════════════════════════════════════════════
+' РЯД 4: дочерние транзакционные таблицы
+' ════════════════════════════════════════════════
+together {
+  class bookings {
+    <b>booking_id</b> : VARCHAR <<PK, UUID>>
+    <b>flight_date</b> : DATE <<partition>>
+    --
+    flight_id : VARCHAR <<FK → flights>>
+    passenger_id : VARCHAR <<FK → passengers>>
+    booking_date : TIMESTAMP
+    fare_class : VARCHAR
+    price_rub : DECIMAL(10,2)
+    status : VARCHAR
+    seat_number : VARCHAR
+    booking_source : VARCHAR
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+  }
+
+  class passengers {
+    <b>passenger_id</b> : VARCHAR <<PK, UUID>>
+    --
+    first_name : VARCHAR
+    last_name : VARCHAR
+    email : VARCHAR
+    phone : VARCHAR
+    date_of_birth : DATE
+    frequent_flyer_id : VARCHAR
+    created_at : TIMESTAMP
+  }
+
+  class price_history {
+    <b>price_id</b> : VARCHAR <<PK, UUID>>
+    <b>flight_date</b> : DATE <<partition>>
+    --
+    flight_id : VARCHAR <<FK → flights>>
+    fare_class : VARCHAR
+    price_rub : DECIMAL(10,2)
+    recorded_at : TIMESTAMP
+    days_before_departure : INTEGER
+  }
+
+  class weather_observations {
+    <b>observation_id</b> : VARCHAR <<PK, UUID>>
+    <b>observation_date</b> : DATE <<partition>>
+    --
+    airport_iata : VARCHAR(3) <<FK → airports>>
+    temperature_min_c : DOUBLE
+    temperature_max_c : DOUBLE
+    temperature_mean_c : DOUBLE
+    precipitation_mm : DOUBLE
+    windspeed_max_kmh : DOUBLE
+    windgusts_max_kmh : DOUBLE
+    visibility_min_km : DOUBLE
+    snowfall_cm : DOUBLE
+    weather_code : INTEGER
+    weather_description : VARCHAR
+    fetched_at : TIMESTAMP
+  }
+}
+
+' ════════════════════════════════════════════════
+' СВЯЗИ — каждая группа своим цветом
+' Синий    : airports → транзакционные
+' Зелёный  : airlines → flights/routes
+' Коричневый: aircraft_types → flights
+' Оранжевый: route_profiles → flights
+' Серый    : airports/airlines → routes
+' Фиолетовый: flights → bookings, price_history
+' Красный  : passengers → bookings
+' ════════════════════════════════════════════════
+
+airports  -[#2563EB]-> flights             : src/dst airport
+airports  -[#2563EB]-> weather_observations : airport_iata
+
+airlines  -[#16A34A]-> flights             : airline_iata
+
+aircraft_types -[#92400E]-> flights        : aircraft_type
+route_profiles -[#EA580C]-> flights        : route_key
+
+airports  -[#9CA3AF,dashed]-> routes       : src/dst
+airlines  -[#9CA3AF,dashed]-> routes       : airline
+
+flights   -[#7C3AED]-> bookings            : flight_id
+flights   -[#7C3AED]-> price_history       : flight_id
+
+passengers -[#DC2626]-> bookings           : passenger_id
+
+' ════════════════════════════════════════════════
+' Легенда
+' ════════════════════════════════════════════════
+note as legend
+  <b>Легенда связей:</b>
+  <color:#2563EB>━━</color>  airports → flights, weather_observations
+  <color:#16A34A>━━</color>  airlines → flights
+  <color:#92400E>━━</color>  aircraft_types → flights
+  <color:#EA580C>━━</color>  route_profiles → flights
+  <color:#9CA3AF>╌╌</color>  airports / airlines → routes
+  <color:#7C3AED>━━</color>  flights → bookings, price_history
+  <color:#DC2626>━━</color>  passengers → bookings
+end note
+
+' ════════════════════════════════════════════════
+' Метаинформация
+' ════════════════════════════════════════════════
+note as meta
+  <b>Справочники (один раз)</b>
+  airports        · 177 российских аэропортов · OpenFlights
+  airlines        · ~30 активных авиакомпаний РФ · OpenFlights
+  routes          · ~600 внутренних маршрутов · OpenFlights
+  aircraft_types  · 15 типов ВС · seed-данные
+  route_profiles  · load_factor, price_tier, seasonality · ручная разметка
+  ─────────────────────────────────────────────────────────
+  <b>Транзакционные (ежедневно)</b>
+  flights              · ~800 рейсов/день · 00:30 UTC
+  bookings             · ~7.8M записей · 4 батча/день
+  passengers           · ~6.5M уникальных
+  price_history        · ~213 600 записей
+  weather_observations · 177 аэропортов × дни · Open-Meteo · 01:00 UTC
+end note
+
+@enduml

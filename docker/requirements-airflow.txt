@@ -1,0 +1,14 @@
+# DuckDB + DuckLake
+duckdb==1.3.0
+
+# dbt with DuckDB adapter
+dbt-duckdb==1.9.2
+dbt-core==1.9.2
+
+# Data generation
+faker==26.0.0
+numpy==1.26.4
+pandas==2.2.2
+
+# Utilities
+python-dotenv==1.0.1

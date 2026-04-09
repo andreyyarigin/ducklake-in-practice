@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+.venv/
+venv/
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# dbt
+dbt/*/target/
+dbt/*/dbt_packages/
+dbt/*/logs/
+
+# Airflow
+airflow/logs/
+
+# Data (generated & cached)
+data/generated/
+*.parquet
+*.duckdb
+# Keep seed CSVs cached locally
+!data/seeds/
+
+# Docker
+docker-compose.override.yml
+
+# Jupyter
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
+
+# OS
+Thumbs.db
+
+CLAUDE.*
+claude.*

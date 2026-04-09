@@ -1,0 +1,9 @@
+FROM apache/superset:4.1.1
+
+USER root
+
+# Pre-install DuckDB extensions at build time to avoid runtime downloads
+RUN pip install --no-cache-dir duckdb==1.3.0 duckdb-engine==0.13.4 psycopg2-binary && \
+    python -c "import duckdb; c = duckdb.connect(); c.execute('INSTALL ducklake; INSTALL postgres; INSTALL httpfs;')"
+
+USER superset

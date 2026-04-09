@@ -1,0 +1,24 @@
+ducklake-in-practice:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: ":memory:"
+      extensions:
+        - ducklake
+        - postgres
+        - httpfs
+      is_ducklake: true
+      module_paths:
+        - /opt/ducklake-in-practice/dbt/ducklake_flights
+      plugins:
+        - module: ducklake_attach_plugin
+      settings:
+        s3_endpoint: "{{ env_var('RUSTFS_ENDPOINT', 'rustfs:9000') | replace('http://', '') }}"
+        s3_access_key_id: "{{ env_var('RUSTFS_ACCESS_KEY', 'rustfsadmin') }}"
+        s3_secret_access_key: "{{ env_var('RUSTFS_SECRET_KEY', 'rustfsadmin123') }}"
+        s3_use_ssl: false
+        s3_url_style: path
+        memory_limit: "6GB"
+        temp_directory: "/tmp/duckdb_tmp"
+      threads: 1

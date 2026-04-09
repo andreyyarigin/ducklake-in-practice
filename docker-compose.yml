@@ -1,0 +1,315 @@
+x-airflow-common: &airflow-common
+  build:
+    context: .
+    dockerfile: docker/Dockerfile.airflow
+  environment:
+    AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_DB_USER:-airflow}:${AIRFLOW_DB_PASSWORD:-airflow_secret_change_me}@postgres:5432/${AIRFLOW_DB:-airflow_metadata}
+    AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
+    AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://${AIRFLOW_DB_USER:-airflow}:${AIRFLOW_DB_PASSWORD:-airflow_secret_change_me}@postgres:5432/${AIRFLOW_DB:-airflow_metadata}
+    AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY:-}
+    AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW__WEBSERVER__SECRET_KEY:-ducklake_airflow_secret_key_change_me}
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
+    AIRFLOW__CORE__DAGS_FOLDER: /opt/ducklake-in-practice/airflow/dags
+    AIRFLOW__LOGGING__BASE_LOG_FOLDER: /opt/airflow/logs
+    # DuckLake connection
+    DUCKLAKE_PG_HOST: postgres
+    DUCKLAKE_PG_DB: ${DUCKLAKE_DB:-ducklake_catalog}
+    DUCKLAKE_PG_USER: ${DUCKLAKE_USER:-ducklake}
+    DUCKLAKE_PG_PASSWORD: ${DUCKLAKE_PASSWORD:-ducklake_secret_change_me}
+    # MinIO S3 (S3-compatible, поддерживает range requests)
+    RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-rustfsadmin}
+    RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:-rustfsadmin123}
+    RUSTFS_ENDPOINT: http://minio:9000
+    RUSTFS_BUCKET: ${RUSTFS_BUCKET:-ducklake-flights}
+    # Data generation
+    GEN_FLIGHTS_PER_DAY: ${GEN_FLIGHTS_PER_DAY:-800}
+    GEN_BOOKINGS_PER_HOUR: ${GEN_BOOKINGS_PER_HOUR:-150}
+  volumes:
+    - .:/opt/ducklake-in-practice
+    - airflow-logs:/opt/airflow/logs
+    - serving-store:/serving
+  networks:
+    - ducklake-net
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  # ─── Storage ───────────────────────────────────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: dl-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${RUSTFS_ACCESS_KEY:-rustfsadmin}
+      MINIO_ROOT_PASSWORD: ${RUSTFS_SECRET_KEY:-rustfsadmin123}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      ducklake-net:
+        aliases:
+          - rustfs
+    healthcheck:
+      test: ["CMD-SHELL", "mc ready local || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  postgres:
+    image: postgres:16
+    container_name: dl-postgres
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_secret_change_me}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./scripts/init-postgres.sql:/docker-entrypoint-initdb.d/init-postgres.sql:ro
+    networks:
+      - ducklake-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: dl-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - ducklake-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ─── Init ──────────────────────────────────────────────────────────
+  init-minio:
+    image: minio/mc:latest
+    container_name: dl-init-minio
+    environment:
+      MC_HOST_local: http://${RUSTFS_ACCESS_KEY:-rustfsadmin}:${RUSTFS_SECRET_KEY:-rustfsadmin123}@minio:9000
+    entrypoint: >
+      /bin/sh -c "
+        until mc ready local 2>/dev/null; do echo 'Waiting for MinIO...'; sleep 2; done;
+        mc mb --ignore-existing local/${RUSTFS_BUCKET:-ducklake-flights};
+        echo 'Bucket ready.';
+      "
+    networks:
+      - ducklake-net
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: on-failure
+
+  airflow-init:
+    <<: *airflow-common
+    container_name: dl-airflow-init
+    command: bash -c "airflow db migrate && airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@ducklake.local --password admin"
+    restart: on-failure
+
+  # ─── Airflow ───────────────────────────────────────────────────────
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: dl-airflow-scheduler
+    command: scheduler
+    restart: unless-stopped
+
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: dl-airflow-webserver
+    command: webserver
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      airflow-scheduler:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  airflow-worker-1:
+    <<: *airflow-common
+    container_name: dl-airflow-worker-1
+    command: celery worker
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  airflow-worker-2:
+    <<: *airflow-common
+    container_name: dl-airflow-worker-2
+    command: celery worker
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  # ─── API ───────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    image: ducklake-in-practice-api:latest
+    container_name: dl-api
+    ports:
+      - "8000:8000"
+    environment:
+      DUCKLAKE_PG_HOST: postgres
+      DUCKLAKE_PG_DB: ${DUCKLAKE_DB:-ducklake_catalog}
+      DUCKLAKE_PG_USER: ${DUCKLAKE_USER:-ducklake}
+      DUCKLAKE_PG_PASSWORD: ${DUCKLAKE_PASSWORD:-ducklake_secret_change_me}
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-rustfsadmin}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:-rustfsadmin123}
+      RUSTFS_ENDPOINT: http://minio:9000
+      RUSTFS_BUCKET: ${RUSTFS_BUCKET:-ducklake-flights}
+      API_HOST: "0.0.0.0"
+      API_PORT: "8000"
+    volumes:
+      - .:/opt/ducklake-in-practice
+    networks:
+      - ducklake-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ─── BI ────────────────────────────────────────────────────────────
+  # Первоначальный экспорт marts из DuckLake в serving store
+  init-serving-store:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    container_name: dl-init-serving-store
+    command: python /opt/ducklake-in-practice/docker/export-serving-store.py
+    environment:
+      RUSTFS_ENDPOINT: http://minio:9000
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-rustfsadmin}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:-rustfsadmin123}
+      RUSTFS_BUCKET: ${RUSTFS_BUCKET:-ducklake-flights}
+      DUCKLAKE_PG_HOST: postgres
+      DUCKLAKE_PG_DB: ${DUCKLAKE_DB:-ducklake_catalog}
+      DUCKLAKE_PG_USER: ${DUCKLAKE_USER:-ducklake}
+      DUCKLAKE_PG_PASSWORD: ${DUCKLAKE_PASSWORD:-ducklake_secret_change_me}
+    volumes:
+      - .:/opt/ducklake-in-practice
+      - serving-store:/serving
+    networks:
+      - ducklake-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: "no"
+
+  superset-init:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.superset
+    container_name: dl-superset-init
+    command: >
+      bash -c "
+        superset db upgrade &&
+        superset fab create-admin --username admin --firstname Admin --lastname User --email admin@ducklake.local --password admin || true &&
+        superset init
+      "
+    environment:
+      SUPERSET_CONFIG_PATH: /app/superset_config.py
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-superset_secret_change_me_32chars!}
+      SUPERSET_DB_PASSWORD: ${SUPERSET_DB_PASSWORD:-superset_secret_change_me}
+    volumes:
+      - ./docker/superset_config.py:/app/superset_config.py:ro
+    networks:
+      - ducklake-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: "no"
+
+  superset:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.superset
+    container_name: dl-superset
+    command: superset run -h 0.0.0.0 -p 8088 --with-threads
+    ports:
+      - "8088:8088"
+    environment:
+      SUPERSET_CONFIG_PATH: /app/superset_config.py
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-superset_secret_change_me_32chars!}
+      SUPERSET_DB_PASSWORD: ${SUPERSET_DB_PASSWORD:-superset_secret_change_me}
+    volumes:
+      - ./docker/superset_config.py:/app/superset_config.py:ro
+      - serving-store:/serving
+    networks:
+      - ducklake-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      superset-init:
+        condition: service_completed_successfully
+      init-serving-store:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+networks:
+  ducklake-net:
+    driver: bridge
+
+volumes:
+  minio-data:
+  postgres-data:
+  redis-data:
+  airflow-logs:
+  serving-store:

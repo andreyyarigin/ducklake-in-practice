@@ -1,0 +1,211 @@
+@startuml field_reference
+skinparam backgroundColor #FAFAFA
+skinparam defaultFontName "DejaVu Sans"
+skinparam defaultFontSize 10
+
+hide circle
+hide empty members
+
+skinparam class {
+  BackgroundColor #FEFCE8
+  BorderColor #374151
+  HeaderBackgroundColor #FEF08A
+  HeaderFontColor #111827
+  FontColor #111827
+  BorderThickness 1.5
+  AttributeFontSize 9
+}
+skinparam classHeader {
+  FontColor #111827
+  FontStyle bold
+}
+skinparam package {
+  FontColor #111827
+  BorderColor #9CA3AF
+}
+
+left to right direction
+
+title <b>ducklake-in-practice — Расшифровка полей таблиц</b>\n<size:10>DuckLake schema: flights · все таблицы</size>
+
+' ───────────────────────────────────────────────
+package "airports — аэропорты России" #EEF2FF {
+  class airports_ref as "airports" {
+    iata_code       · уникальный 3-буквенный код IATA (SVO, LED, AER)
+    icao_code       · 4-буквенный код ICAO (UUEE, ULLL, URSS)
+    name            · официальное название аэропорта
+    city            · город расположения
+    country         · страна (все = Russia в нашем датасете)
+    latitude        · широта (десятичные градусы)
+    longitude       · долгота (десятичные градусы)
+    altitude        · высота над уровнем моря, метры
+    timezone_offset · смещение UTC (часы, напр. +3.0)
+    timezone_name   · IANA-зона (напр. Europe/Moscow)
+  }
+}
+
+' ───────────────────────────────────────────────
+package "airlines — авиакомпании" #EEF2FF {
+  class airlines_ref as "airlines" {
+    airline_id      · внутренний числовой идентификатор
+    iata_code       · 2-буквенный код IATA (SU, S7, DP)
+    icao_code       · 3-буквенный код ICAO
+    name            · название авиакомпании
+    country         · страна регистрации
+    active          · true = действующий перевозчик
+  }
+}
+
+' ───────────────────────────────────────────────
+package "routes — маршруты" #EEF2FF {
+  class routes_ref as "routes" {
+    airline_iata    · авиакомпания, выполняющая рейс (FK → airlines)
+    src_airport_iata · аэропорт вылета (FK → airports)
+    dst_airport_iata · аэропорт прилёта (FK → airports)
+    codeshare       · true = кодшеринговый рейс
+    stops           · число промежуточных посадок (обычно 0)
+    equipment       · типы ВС через пробел (напр. "320 319")
+  }
+}
+
+' ───────────────────────────────────────────────
+package "aircraft_types — типы воздушных судов" #EEF2FF {
+  class aircraft_ref as "aircraft_types" {
+    icao_code           · 4-буквенный код ИКАО (A320, B738, SU95)
+    iata_code           · 3-буквенный код ИАТА (320, 73H, 100)
+    manufacturer        · производитель (Airbus, Boeing, Sukhoi)
+    model               · коммерческое название модели
+    family              · семейство ВС (A320, B737, SSJ)
+    seats_economy       · мест в экономклассе
+    seats_business      · мест в бизнес-классе
+    seats_first         · мест в первом классе
+    seats_total         · общее число мест
+    range_km            · максимальная дальность, км
+    fuel_burn_kg_per_km · расход топлива, кг/км
+    first_flight_year   · год первого полёта
+    engine_type         · тип двигателя (turbofan, turboprop)
+    body_type           · ширина фюзеляжа (narrowbody / widebody)
+  }
+}
+
+' ───────────────────────────────────────────────
+package "route_profiles — профили маршрутов" #EEF2FF {
+  class rp_ref as "route_profiles" {
+    route_key           · ключ вида SVO-LED
+    src_airport_iata    · аэропорт вылета
+    dst_airport_iata    · аэропорт прилёта
+    base_load_factor    · базовый коэффициент загрузки [0..1]
+    price_tier          · ценовой сегмент: budget / medium / premium
+    seasonality_type    · тип сезонности: low / high_summer
+    competition_level   · уровень конкуренции: low / medium / high
+  }
+}
+
+' ───────────────────────────────────────────────
+package "flights — рейсы" #F0FDF4 {
+  class flights_ref as "flights" {
+    flight_id           · UUID рейса, первичный ключ
+    flight_date         · дата вылета, ключ партиции Parquet
+    flight_number       · номер рейса (SU1234, S72345)
+    airline_iata        · авиакомпания (FK → airlines)
+    src_airport_iata    · аэропорт вылета (FK → airports)
+    dst_airport_iata    · аэропорт прилёта (FK → airports)
+    aircraft_type       · тип ВС ICAO (FK → aircraft_types)
+    scheduled_departure · плановое время отправления (UTC)
+    scheduled_arrival   · плановое время прибытия (UTC)
+    actual_departure    · фактическое время отправления (NULL если не вылетел)
+    actual_arrival      · фактическое время прибытия (NULL если не прибыл)
+    status              · статус: scheduled / boarding / departed / arrived / cancelled / delayed
+    total_seats         · общее число мест на этом рейсе
+    created_at          · время создания записи
+    updated_at          · время последнего обновления
+  }
+}
+
+' ───────────────────────────────────────────────
+package "bookings — бронирования" #F0FDF4 {
+  class bookings_ref as "bookings" {
+    booking_id          · UUID бронирования, первичный ключ
+    flight_date         · дата рейса, ключ партиции Parquet
+    flight_id           · рейс (FK → flights)
+    passenger_id        · пассажир (FK → passengers)
+    booking_date        · дата и время совершения бронирования
+    fare_class          · класс тарифа: economy / business / first
+    price_rub           · итоговая цена в рублях
+    status              · confirmed / checked_in / boarded / cancelled / no_show
+    seat_number         · номер места (NULL = место не выбрано при бронировании)
+    booking_source      · канал продажи: web / mobile / agency / corporate
+    created_at          · время создания записи
+    updated_at          · время последнего обновления
+  }
+}
+
+' ───────────────────────────────────────────────
+package "passengers — пассажиры" #F0FDF4 {
+  class passengers_ref as "passengers" {
+    passenger_id        · UUID пассажира, первичный ключ
+    first_name          · имя
+    last_name           · фамилия
+    email               · адрес электронной почты
+    phone               · номер телефона
+    date_of_birth       · дата рождения
+    frequent_flyer_id   · номер карты лояльности (NULL ≈ 70% пассажиров)
+    created_at          · время создания профиля пассажира
+  }
+}
+
+' ───────────────────────────────────────────────
+package "price_history — история цен" #F0FDF4 {
+  class price_ref as "price_history" {
+    price_id              · UUID записи, первичный ключ
+    flight_date           · дата рейса, ключ партиции Parquet
+    flight_id             · рейс (FK → flights)
+    fare_class            · класс тарифа: economy / business / first
+    price_rub             · цена на момент снэпшота, руб.
+    recorded_at           · дата и время фиксации цены
+    days_before_departure · сколько дней до вылета на момент снэпшота
+  }
+
+  note right of price_ref
+    Dynamic pricing — множители к базовой цене:
+    60+ дней  : ×0.70  (раннее бронирование)
+    30–59 дней: ×0.85
+    14–29 дней: ×1.00  (базовая цена)
+    7–13 дней : ×1.20
+    1–6 дней  : ×1.60
+    День вылета: ×2.00 (last-minute)
+  end note
+}
+
+' ───────────────────────────────────────────────
+package "weather_observations — погода" #F0FDF4 {
+  class weather_ref as "weather_observations" {
+    observation_id      · UUID наблюдения, первичный ключ
+    observation_date    · дата наблюдения, ключ партиции Parquet
+    airport_iata        · аэропорт (FK → airports)
+    temperature_min_c   · минимальная температура за сутки, °C
+    temperature_max_c   · максимальная температура за сутки, °C
+    temperature_mean_c  · средняя температура за сутки, °C
+    precipitation_mm    · осадки, мм
+    windspeed_max_kmh   · максимальная скорость ветра, км/ч
+    windgusts_max_kmh   · максимальные порывы ветра, км/ч
+    visibility_min_km   · минимальная видимость, км
+    snowfall_cm         · снегопад, см
+    weather_code        · код погоды WMO (0=ясно, 95=гроза, и т.д.)
+    weather_description · текстовое описание по WMO-коду
+    fetched_at          · время загрузки из Open-Meteo API
+  }
+
+  note right of weather_ref
+    WMO weather codes (выборка):
+    0   — Ясно
+    1-3 — Преимущественно ясно / переменная облачность
+    45, 48 — Туман
+    51-67 — Морось / Дождь
+    71-77 — Снег
+    80-82 — Ливень
+    95  — Гроза
+  end note
+}
+
+@enduml

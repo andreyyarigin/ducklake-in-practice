@@ -1,0 +1,23 @@
+FROM apache/airflow:2.9.3-python3.11
+
+USER root
+
+# System dependencies for DuckDB and AWS CLI
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install AWS CLI for S3 operations
+RUN curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip \
+    && unzip -q /tmp/awscliv2.zip -d /tmp \
+    && /tmp/aws/install \
+    && rm -rf /tmp/awscliv2.zip /tmp/aws
+
+USER airflow
+
+# Python packages: DuckDB, DuckLake, dbt, generators dependencies
+COPY docker/requirements-airflow.txt /tmp/requirements-airflow.txt
+RUN pip install --no-cache-dir -r /tmp/requirements-airflow.txt
+
+WORKDIR /opt/ducklake-in-practice

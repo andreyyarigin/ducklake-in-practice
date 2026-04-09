@@ -1,0 +1,48 @@
+@startuml airflow_dags
+!theme plain
+skinparam backgroundColor #FAFAFA
+skinparam defaultFontName "DejaVu Sans"
+skinparam defaultFontSize 11
+
+skinparam rectangle {
+  BorderThickness 1.5
+  FontColor #111827
+  FontSize 11
+}
+skinparam component {
+  BorderThickness 1.5
+  FontSize 10
+  FontColor #111827
+}
+
+title <b>ducklake-in-practice — Airflow DAGs</b>\n<size:11>6 DAGs · расписание UTC · шаги пронумерованы в порядке выполнения</size>
+
+together {
+
+  rectangle "**00:30 UTC** daily\ningest_flights" as dag_f #EEF2FF {
+    component "1. generate_schedule\n   ~800 flights/day, +7 days\n2. update_flight_statuses\n   status='arrived' for past" as gf #C7D2FE
+  }
+
+  rectangle "**00:15/06:15/12:15/18:15 UTC**\ningest_bookings (4×/day)" as dag_b #E8FFF0 {
+    component "1. generate_bookings_batch\n   bookings + passengers + price_history\n   DuckLake ACID 3-table INSERT\n2. log_batch_stats\n   COUNT(*) last 6 hours" as gb #86EFAC
+  }
+
+  rectangle "**01:00 UTC** daily\ningest_weather" as dag_w #FFF7ED {
+    component "1. backfill_weather_history\n   missing dates, idempotent\n2. fetch_and_store_weather\n   BEGIN\n     UPDATE flights.status\n     INSERT weather_observations\n   COMMIT · DuckLake multi-table ACID" as gw #FED7AA
+  }
+
+  rectangle "**02:00 UTC** daily\ndbt_run_daily" as dag_d #FEFCE8 {
+    component "1. dbt_deps  (dbt-labs/dbt_utils)\n2. dbt_run_staging\n   10 models: type casts + filters\n3. dbt_run_bookings_agg\n   7.8M → ~71K rows\n4. dbt_run_intermediate\n   4 models: enrichment + joins\n5. dbt_run_marts\n   10 models: business metrics" as dd #FDE68A
+  }
+
+  rectangle "**03:00 UTC** daily\nmaintenance + export_serving_store" as dag_m #F5F0FF {
+    component "1. expire_snapshots\n   ducklake_expire_snapshots TIMESTAMP -7d\n2. compact_tables\n   ducklake_compact: flights, bookings,\n   passengers, price_history\n3. vacuum + stats + freshness\n   lag>3h → WARNING\n4. export_serving_store\n   READ marts · WRITE → RENAME flights.duckdb" as mm #E9D5FF
+  }
+
+  rectangle "**03:30 UTC** daily\ndbt_test_daily" as dag_t #ECFDF5 {
+    component "1. dbt_deps\n2. dbt_test_staging\n   39 tests: unique, not_null,\n   relationships, accepted_values\n3. dbt_test_intermediate  (11 tests)\n4. dbt_test_marts\n   33 tests: range checks,\n   custom SQL assertions" as tt #86EFAC
+  }
+
+}
+
+@enduml

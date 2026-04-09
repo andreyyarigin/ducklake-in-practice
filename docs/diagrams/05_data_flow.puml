@@ -1,0 +1,135 @@
+@startuml data_flow
+!theme plain
+skinparam backgroundColor #FAFAFA
+skinparam defaultFontName "DejaVu Sans"
+skinparam defaultFontSize 11
+skinparam ArrowColor #374151
+skinparam ArrowThickness 2
+
+skinparam participant {
+  BackgroundColor #FFFFFF
+  BorderColor #374151
+  FontColor #111827
+  BorderThickness 1.5
+}
+skinparam actor {
+  BackgroundColor #EEF2FF
+  BorderColor #6366F1
+}
+skinparam database {
+  BackgroundColor #FFF7ED
+  BorderColor #EA580C
+}
+skinparam collections {
+  BackgroundColor #F0FDF4
+  BorderColor #16A34A
+}
+skinparam note {
+  BackgroundColor #FFFBEB
+  BorderColor #D97706
+  FontColor #78350F
+  FontSize 10
+}
+
+title <b>ducklake-in-practice — Сквозной поток данных</b>
+
+actor "Airflow\nScheduler" as sched
+participant "Worker 1\n(ingest)" as w1
+participant "Worker 2\n(dbt)" as w2
+database "DuckLake\n(PostgreSQL catalog\n+ MinIO Parquet)" as dl
+collections "dbt\nmodels" as dbt
+database "Serving Store\n/serving/\nflights.duckdb" as serving
+participant "FastAPI\n:8000" as api
+participant "Superset\n:8088" as superset
+actor "Аналитик /\nBI User" as user
+
+== 00:30 UTC — Ingestion: Flights ==
+sched -> w1 : trigger ingest_flights
+activate w1
+w1 -> w1 : generate_flights(+7 дней)\nhaversine distances\ndelay / cancellation simulation
+w1 -> dl : INSERT INTO flights.flights\n(~800 строк, partition=flight_date)
+note right of dl
+  DuckLake: новый снэпшот
+  Parquet file в s3://ducklake-flights/
+  data/main/flights/flight_date=YYYY-MM-DD/
+end note
+w1 -> dl : UPDATE flights.flights\nSET status='arrived'\nWHERE flight_date=yesterday\nAND scheduled_arrival < now
+deactivate w1
+
+== 00:15, 06:15, 12:15, 18:15 UTC — Ingestion: Bookings ==
+sched -> w1 : trigger ingest_bookings
+sched -> w2 : trigger ingest_bookings (parallel!)
+activate w1
+activate w2
+
+w1 -> dl : SELECT flights\nWHERE flight_date BETWEEN -1d AND +90d
+dl --> w1 : список рейсов
+w1 -> w1 : generate_bookings(\n  route_profiles,\n  booking_curve,\n  dynamic_pricing\n)
+
+note over w1, w2
+  DuckLake оптимистичный concurrency control:
+  оба воркера пишут одновременно
+  конфликт → retry с exponential backoff
+end note
+
+w1 -> dl : BEGIN\nINSERT INTO flights.passengers\nINSERT INTO flights.bookings\nINSERT INTO flights.price_history\nCOMMIT
+w2 -> dl : BEGIN\nINSERT INTO flights.passengers\nINSERT INTO flights.bookings\nINSERT INTO flights.price_history\nCOMMIT
+deactivate w1
+deactivate w2
+
+== 01:00 UTC — Ingestion: Weather (Multi-Table ACID) ==
+sched -> w1 : trigger ingest_weather
+activate w1
+w1 -> "Open-Meteo API" : GET /archive\n?airport_coords&date=yesterday
+"Open-Meteo API" --> w1 : weather data\n177 аэропортов
+w1 -> dl : BEGIN\n  UPDATE flights.flights status='arrived'\n  INSERT INTO flights.weather_observations\nCOMMIT
+note right of dl
+  ██ DuckLake ACID преимущество ██
+  Два UPDATE + INSERT атомарны.
+  В Iceberg это 2 отдельных коммита.
+  Если погода не загрузилась —
+  рейсы тоже не обновятся.
+end note
+deactivate w1
+
+== 02:00 UTC — Transformation (dbt) ==
+sched -> w1 : trigger dbt_run_daily
+activate w1
+w1 -> dl : dbt deps + dbt run --select staging\n(stg_flights, stg_bookings, ...)\n10 моделей → table в flights.main
+w1 -> dl : dbt run --select int_bookings_daily_agg\n(7.8M bookings → ~71K rows)\nОТДЕЛЬНЫЙ ПРОЦЕСС (OOM prevention)
+w1 -> dl : dbt run --select intermediate\n(int_flights_enriched, int_bookings_enriched, ...)\n4 модели
+w1 -> dl : dbt run --select marts\n(mart_route_daily, mart_airline_daily, ...)\n10 моделей
+dl --> w1 : all models materialized
+deactivate w1
+
+== 03:00 UTC — Export to Serving Store ==
+sched -> w2 : trigger export_serving_store
+activate w2
+w2 -> dl : READ all marts\n(10 таблиц из flights.main)
+dl --> w2 : mart data
+w2 -> serving : WRITE flights_new.duckdb\n(полная запись)
+w2 -> serving : RENAME flights_new.duckdb\n→ flights.duckdb\n(атомарная замена)
+note right of serving
+  Superset никогда не видит
+  частично обновлённый файл.
+  rename() атомарен на уровне FS.
+end note
+deactivate w2
+
+== Online — Serving ==
+user -> superset : открывает дашборд
+superset -> serving : SQL: SELECT * FROM mart_route_daily\nWHERE ...
+serving --> superset : результат из DuckDB файла
+superset --> user : 13 чартов\n(маршруты, авиакомпании,\nсегменты, цены)
+
+user -> api : GET /routes/SVO-LED/daily
+api -> serving : DuckDB in-process\nSELECT FROM mart_route_daily\nWHERE route_key='SVO-LED'
+serving --> api : JSON response
+api --> user : RouteDailyMetrics[]
+
+user -> api : GET /time-travel/snapshots
+api -> dl : SELECT FROM ducklake_snapshots('flights')
+dl --> api : список снэпшотов
+api --> user : SnapshotInfo[]
+
+@enduml

@@ -1,0 +1,117 @@
+version: 2
+
+models:
+  - name: stg_airports
+    description: "Аэропорты РФ — очищенные и отфильтрованные"
+    columns:
+      - name: airport_id
+        tests: [unique, not_null]
+      - name: iata_code
+        tests: [unique, not_null]
+      - name: country
+        tests:
+          - accepted_values:
+              values: ["Russia"]
+
+  - name: stg_airlines
+    description: "Активные авиакомпании РФ"
+    columns:
+      - name: airline_id
+        tests: [unique, not_null]
+      - name: iata_code
+        tests: [unique, not_null]
+
+  - name: stg_routes
+    description: "Внутренние маршруты РФ (оба аэропорта — российские)"
+
+  - name: stg_flights
+    description: "Рейсы — дедуплицированные, приведённые типы"
+    columns:
+      - name: flight_id
+        tests: [unique, not_null]
+      - name: flight_date
+        tests: [not_null]
+      - name: status
+        tests:
+          - accepted_values:
+              values: ["scheduled", "boarding", "departed", "arrived", "cancelled", "delayed"]
+      - name: total_seats
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 1
+              max_value: 600
+
+  - name: stg_bookings
+    description: "Бронирования — дедуплицированные, с фильтром price_rub > 0"
+    columns:
+      - name: booking_id
+        tests: [unique, not_null]
+      - name: flight_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_flights')
+              field: flight_id
+      - name: price_rub
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+      - name: fare_class
+        tests:
+          - accepted_values:
+              values: ["economy", "business", "first"]
+      - name: status
+        tests:
+          - accepted_values:
+              values: ["confirmed", "cancelled", "checked_in", "boarded", "no_show"]
+      - name: booking_source
+        tests:
+          - accepted_values:
+              values: ["web", "mobile", "agency", "corporate"]
+
+  - name: stg_passengers
+    description: "Пассажиры — дедуплицированные, нормализованные имена"
+    columns:
+      - name: passenger_id
+        tests: [unique, not_null]
+
+  - name: stg_price_history
+    description: "История цен — только положительные значения"
+    columns:
+      - name: price_id
+        tests: [unique, not_null]
+      - name: flight_id
+        tests: [not_null]
+      - name: fare_class
+        tests:
+          - accepted_values:
+              values: ["economy", "business", "first"]
+      - name: price_rub
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+
+  - name: stg_route_profiles
+    description: "Профили маршрутов — load_factor, price_tier, seasonality"
+    columns:
+      - name: route_key
+        tests: [unique, not_null]
+      - name: base_load_factor
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0.0
+              max_value: 1.0
+      - name: price_tier
+        tests:
+          - accepted_values:
+              values: ["budget", "medium", "premium"]
+      - name: seasonality_type
+        tests:
+          - accepted_values:
+              values: ["low", "high_summer"]
+      - name: competition_level
+        tests:
+          - accepted_values:
+              values: ["low", "medium", "high"]

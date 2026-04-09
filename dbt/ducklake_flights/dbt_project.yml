@@ -1,0 +1,33 @@
+name: ducklake_flights
+version: "1.0.0"
+config-version: 2
+
+profile: ducklake-in-practice
+
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  ducklake_flights:
+    raw:
+      +materialized: view
+
+    staging:
+      +materialized: table
+      +database: flights
+      +schema: main
+
+    intermediate:
+      +materialized: table
+      +database: flights
+      +schema: main
+
+    marts:
+      +materialized: table
+      +database: flights
+      +schema: main

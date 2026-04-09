@@ -1,0 +1,131 @@
+@startuml ducklake_internals
+!theme plain
+skinparam backgroundColor #FAFAFA
+skinparam defaultFontName "DejaVu Sans"
+skinparam defaultFontSize 11
+skinparam ArrowColor #374151
+skinparam ArrowThickness 1.5
+
+skinparam rectangle {
+  BorderThickness 1.5
+  FontColor #111827
+  BackgroundColor #FAFAFA
+}
+skinparam database {
+  BorderThickness 1.5
+  FontColor #111827
+}
+skinparam note {
+  BackgroundColor #FFFBEB
+  BorderColor #D97706
+  FontColor #78350F
+  FontSize 10
+}
+
+title <b>ducklake-in-practice — DuckLake Internals</b>\n<size:11>Как работают snapshots, partitioning и ACID</size>
+
+rectangle "PostgreSQL :5433 — ducklake_catalog" as pg_box #FFF7ED {
+  rectangle "Catalog Tables" as catalog_tables {
+    database "ducklake_snapshot\n(5 373 снэпшотов)" as snaps #FED7AA
+    database "ducklake_table\n(10 таблиц)" as tables #FED7AA
+    database "ducklake_data_file\n(4 898 файлов)" as files #FED7AA
+    database "ducklake_column\nducklake_partition_column\nducklake_file_partition_value" as meta #FED7AA
+    database "ducklake_snapshot_changes\nducklake_table_stats\nducklake_tag" as stats #FED7AA
+  }
+}
+
+rectangle "MinIO / rustfs :9000" as minio_box #EEF2FF {
+  rectangle "s3://ducklake-flights/data/main/" as s3 {
+    rectangle "flights/" as fl_dir {
+      database "flight_date=2026-01-01/\n  data_abc123.parquet" as pq1 #C7D2FE
+      database "flight_date=2026-01-02/\n  data_def456.parquet" as pq2 #C7D2FE
+      database "flight_date=2026-04-08/\n  data_xyz789.parquet" as pq3 #C7D2FE
+    }
+    rectangle "bookings/" as bk_dir {
+      database "flight_date=2026-01-01/\n  data_*.parquet" as bk1 #C7D2FE
+    }
+    rectangle "weather_observations/" as wx_dir {
+      database "observation_date=2026-04-07/\n  data_*.parquet" as wx1 #C7D2FE
+    }
+  }
+}
+
+rectangle "DuckDB Process (Worker)" as duckdb_box #F0FDF4 {
+  rectangle "Extensions" as ext {
+    rectangle "ducklake.so" as dl_ext #86EFAC
+    rectangle "postgres.so" as pg_ext #86EFAC
+    rectangle "httpfs.so" as s3_ext #86EFAC
+  }
+  rectangle "Connection" as conn {
+    rectangle "ATTACH 'ducklake:postgres:...'\nAS flights\n(DATA_PATH 's3://ducklake-flights/')" as attach #86EFAC
+  }
+}
+
+note top of pg_box
+  Каталог хранит метаданные о каждом файле:
+  • путь в S3
+  • партиция (flight_date=YYYY-MM-DD)
+  • диапазон значений колонок (min/max)
+  • снэпшот создания / удаления
+  Нет JSON-манифестов как в Iceberg!
+end note
+
+note top of minio_box
+  Parquet файлы иммутабельны.
+  DELETE = создание новой версии.
+  Старые файлы помечаются для удаления
+  и физически удаляются через:
+  CALL ducklake_cleanup_old_files('flights')
+end note
+
+note right of duckdb_box
+  Одно DuckDB соединение = один writer.
+  Readers параллельны (read_only=True).
+  threads: 1 в dbt — обязательно.
+end note
+
+rectangle "Time Travel" as tt_box #FDF4FF {
+  rectangle "AT (VERSION => snapshot_id)" as version_clause #E9D5FF
+  note right of version_clause
+    SELECT * FROM flights.mart_route_daily
+    AT (VERSION => 42)
+    WHERE route_key = 'SVO-LED'
+
+    DuckLake читает ТОЛЬКО файлы,
+    которые существовали в снэпшоте 42.
+    Новые файлы игнорируются.
+  end note
+}
+
+rectangle "ACID Multi-Table Transaction" as acid_box #FFF1F2 {
+  rectangle "BEGIN → operations → COMMIT" as txn #FECDD3
+  note right of txn
+    conn.execute("BEGIN")
+    conn.execute("UPDATE flights.flights ...")    ← таблица 1
+    conn.execute("INSERT INTO weather_obs ...")  ← таблица 2
+    conn.execute("COMMIT")
+
+    При сбое → ROLLBACK.
+    Оба изменения видны вместе или ни одно.
+    Apache Iceberg: только 1 таблица на транзакцию.
+  end note
+}
+
+rectangle "Maintenance (03:00 UTC)" as maint_box #F0FDF4 {
+  rectangle "ducklake_expire_snapshots\n(TIMESTAMP older than 7 days)" as expire #86EFAC
+  rectangle "ducklake_compact\n(merge small Parquet files)" as compact #86EFAC
+  rectangle "ducklake_vacuum\n(физически удалить файлы из MinIO)" as vacuum #86EFAC
+  expire -right-> compact
+  compact -right-> vacuum
+}
+
+duckdb_box --> pg_box : читает метаданные\n(plan query)
+duckdb_box --> minio_box : читает/пишет\nParquet файлы
+pg_box --> files : хранит пути к файлам\n(rustfs:9000/...)
+files --> pq1
+files --> pq2
+files --> pq3
+files --> bk1
+files --> wx1
+
+@enduml

@@ -1,0 +1,155 @@
+version: 2
+
+models:
+  - name: mart_route_daily
+    description: "Ежедневные метрики по маршрутам: выручка, PAX, load factor, задержки"
+    columns:
+      - name: route_key
+        tests: [not_null]
+      - name: flight_date
+        tests: [not_null]
+      - name: load_factor_pct
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 110  # до 10% overbooking допустимо
+      - name: total_revenue
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+
+  - name: mart_route_weekly
+    description: "Еженедельные агрегаты по маршрутам"
+    columns:
+      - name: route_key
+        tests: [not_null]
+      - name: week_start
+        tests: [not_null]
+      - name: load_factor_pct
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 110  # до 10% overbooking допустимо
+
+  - name: mart_route_monthly
+    description: "Ежемесячные агрегаты по маршрутам"
+    columns:
+      - name: route_key
+        tests: [not_null]
+      - name: month_start
+        tests: [not_null]
+
+  - name: mart_airline_daily
+    description: "Ежедневные метрики по авиакомпаниям: рейсы, выручка, отмены"
+    columns:
+      - name: airline_iata
+        tests: [not_null]
+      - name: flight_date
+        tests: [not_null]
+      - name: cancellation_rate_pct
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+
+  - name: mart_airport_daily
+    description: "Ежедневные метрики по аэропортам: вылеты, прилёты, задержки"
+    columns:
+      - name: airport_iata
+        tests: [not_null]
+      - name: flight_date
+        tests: [not_null]
+
+  - name: mart_pricing_analysis
+    description: "Средние цены по маршрутам, классам и бакетам дней до вылета"
+    columns:
+      - name: route_key
+        tests: [not_null]
+      - name: days_bucket
+        tests: [not_null]
+      - name: avg_price_rub
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+
+  - name: mart_booking_funnel
+    description: "Воронка бронирований по источнику и дате: confirmed → checked_in → boarded"
+    columns:
+      - name: booking_date
+        tests: [not_null]
+      - name: booking_source
+        tests: [not_null]
+      - name: checkin_conversion_pct
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+              where: "checkin_conversion_pct is not null"
+
+  - name: mart_delay_analysis
+    description: "Анализ задержек по маршруту, авиакомпании, дню недели и часу вылета: задержки, отмены, перцентили"
+    columns:
+      - name: route_key
+        tests: [not_null]
+      - name: flight_date
+        tests: [not_null]
+      - name: day_of_week
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 1
+              max_value: 7
+      - name: hour_of_day
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 23
+      - name: on_time_pct
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+              where: "on_time_pct is not null"
+      - name: cancellation_rate_pct
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+              where: "cancellation_rate_pct is not null"
+
+  - name: mart_passenger_segment_stats
+    description: "Агрегат по сегментам пассажиров (4 строки): кол-во пассажиров, средние цены, выручка, доли классов и каналов"
+    columns:
+      - name: segment
+        tests:
+          - not_null
+          - unique
+          - accepted_values:
+              values: ['frequent', 'regular', 'occasional', 'one_time']
+      - name: passenger_count
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+      - name: avg_price_rub
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+
+  - name: mart_passenger_segments
+    description: "Снэпшот пассажиров: история бронирований, сегментация, любимые маршруты и авиакомпании"
+    columns:
+      - name: passenger_id
+        tests: [not_null, unique]
+      - name: segment
+        tests:
+          - accepted_values:
+              values: ['frequent', 'regular', 'occasional', 'one_time']
+      - name: total_revenue_rub
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+      - name: cancellation_rate_pct
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+              where: "cancellation_rate_pct is not null"

@@ -1,0 +1,116 @@
+@startuml dbt_lineage
+!theme plain
+skinparam backgroundColor #FAFAFA
+skinparam defaultFontName "DejaVu Sans"
+skinparam defaultFontSize 11
+skinparam ArrowColor #6B7280
+skinparam ArrowThickness 1.5
+
+skinparam rectangle {
+  BorderThickness 1.5
+}
+
+skinparam component {
+  BorderThickness 1.5
+  FontSize 10
+}
+
+title <b>ducklake-in-practice — dbt Lineage</b>\n<size:11>raw → staging → intermediate → marts</size>
+
+rectangle "RAW (DuckLake source tables)" as raw_layer {
+  component "[raw] airports" as r_airports #E0E7FF
+  component "[raw] airlines" as r_airlines #E0E7FF
+  component "[raw] routes" as r_routes #E0E7FF
+  component "[raw] aircraft_types" as r_aircraft #E0E7FF
+  component "[raw] route_profiles" as r_rp #E0E7FF
+  component "[raw] flights" as r_flights #E0E7FF
+  component "[raw] bookings" as r_bookings #E0E7FF
+  component "[raw] passengers" as r_passengers #E0E7FF
+  component "[raw] price_history" as r_price #E0E7FF
+  component "[raw] weather_observations" as r_weather #E0E7FF
+}
+
+rectangle "STAGING  ·  materialized: table  ·  flights.main" as stg_layer #EEF2FF {
+  component "stg_airports\nfilter country='Russia'" as stg_airports #C7D2FE
+  component "stg_airlines\nfilter active=true" as stg_airlines #C7D2FE
+  component "stg_routes\njoin airports → domestic" as stg_routes #C7D2FE
+  component "stg_aircraft_types\nno transform" as stg_aircraft #C7D2FE
+  component "stg_route_profiles\nfilter load_factor ∈ [0,1]" as stg_rp #C7D2FE
+  component "stg_flights\ndedup, type casts" as stg_flights #C7D2FE
+  component "stg_bookings\nfilter price_rub > 0" as stg_bookings #C7D2FE
+  component "stg_passengers\ntrim, normalize" as stg_passengers #C7D2FE
+  component "stg_price_history\nfilter price_rub > 0" as stg_price #C7D2FE
+  component "stg_weather_observations\ndedup, add severity flag" as stg_weather #C7D2FE
+}
+
+rectangle "INTERMEDIATE  ·  materialized: table / view  ·  flights.main" as int_layer #F0FDF4 {
+  component "int_flights_enriched\n[TABLE]\nflights + airports(src,dst)\n+ airlines + aircraft_types\n+ weather(src,dst)" as int_flights #86EFAC
+  component "int_bookings_enriched\n[VIEW]\nbookings + int_flights\n+ passengers" as int_bookings #86EFAC
+  component "int_bookings_daily_agg\n[TABLE]\n7.8M → ~71K rows\nGROUP BY flight_id" as int_agg #86EFAC
+  component "int_price_curves\n[VIEW]\nprice_history + int_flights\n+ days_bucket" as int_price #86EFAC
+}
+
+rectangle "MARTS  ·  materialized: table / view  ·  flights.main" as mart_layer #FFF7ED {
+  component "mart_route_daily\n[TABLE]\nroute × day\nrevenue, LF, delays" as m_route_d #FED7AA
+  component "mart_route_weekly\n[TABLE]\nroute × week" as m_route_w #FED7AA
+  component "mart_route_monthly\n[TABLE]\nroute × month" as m_route_m #FED7AA
+  component "mart_airline_daily\n[TABLE]\nairline × day" as m_airline #FED7AA
+  component "mart_airport_daily\n[TABLE]\nairport × day\ndep + arr" as m_airport #FED7AA
+  component "mart_delay_analysis\n[TABLE]\nroute × airline × hour\np75/p95 delays" as m_delay #FED7AA
+  component "mart_weather_delay\n[TABLE]\ndelay × weather\nfuel estimates" as m_weather #FED7AA
+  component "mart_booking_funnel\n[TABLE]\nday × source × class\nconversion rates" as m_funnel #FED7AA
+  component "mart_pricing_analysis\n[TABLE]\nroute × days_bucket\navg/min/max price" as m_pricing #FED7AA
+  component "mart_passenger_segments\n[VIEW]\nRFM segmentation\n6.5M rows" as m_pax #FED7AA
+  component "mart_passenger_segment_stats\n[TABLE]\nsegment aggregates\n4 rows → serving store" as m_pax_stats #FED7AA
+}
+
+' Raw → Staging
+r_airports --> stg_airports
+r_airlines --> stg_airlines
+r_routes --> stg_routes
+r_aircraft --> stg_aircraft
+r_rp --> stg_rp
+r_flights --> stg_flights
+r_bookings --> stg_bookings
+r_passengers --> stg_passengers
+r_price --> stg_price
+r_weather --> stg_weather
+
+' Staging → Intermediate
+stg_flights --> int_flights
+stg_airports --> int_flights
+stg_airlines --> int_flights
+stg_aircraft --> int_flights
+stg_weather --> int_flights
+
+stg_bookings --> int_bookings
+int_flights --> int_bookings
+stg_passengers --> int_bookings
+
+stg_bookings --> int_agg
+stg_flights --> int_agg
+
+stg_price --> int_price
+int_flights --> int_price
+
+' Intermediate → Marts
+int_flights --> m_route_d
+int_agg --> m_route_d
+
+m_route_d --> m_route_w
+m_route_d --> m_route_m
+
+int_flights --> m_airline
+int_agg --> m_airline
+
+int_flights --> m_airport
+int_flights --> m_delay
+int_flights --> m_weather
+
+stg_bookings --> m_funnel
+int_price --> m_pricing
+
+int_bookings --> m_pax
+m_pax --> m_pax_stats
+
+@enduml

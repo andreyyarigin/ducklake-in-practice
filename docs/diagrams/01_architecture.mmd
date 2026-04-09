@@ -1,0 +1,70 @@
+flowchart TD
+    classDef orch fill:#EEF2FF,stroke:#6366F1,color:#1E1B4B
+    classDef dl fill:#FFF7ED,stroke:#EA580C,color:#431407
+    classDef dbt fill:#F0FDF4,stroke:#16A34A,color:#14532D
+    classDef serving fill:#F0F9FF,stroke:#0284C7,color:#0C4A6E
+    classDef clients fill:#FDF4FF,stroke:#9333EA,color:#581C87
+    classDef ext fill:#FEFCE8,stroke:#CA8A04,color:#713F12
+
+    %% ── Слой 1: Оркестрация ──────────────────────
+    subgraph L1["① Оркестрация — Airflow + Redis"]
+        WS["Airflow Webserver :8080"]
+        SCHED["Airflow Scheduler"]
+        REDIS["Redis :6379 · Celery Broker"]
+        W1["Celery Worker 1\ningest + dbt"]
+        W2["Celery Worker 2\ningest parallel"]
+        WS --> SCHED --> REDIS
+        REDIS --> W1
+        REDIS --> W2
+    end
+
+    %% ── Слой 2: DuckLake ─────────────────────────
+    subgraph L2["② DuckLake — Source of Truth"]
+        PG["PostgreSQL :5433\nducklake_catalog · airflow_metadata · superset_appdb"]
+        S3["MinIO / rustfs :9000\ns3://ducklake-flights/ · Parquet · ~500 MB/day"]
+    end
+
+    %% ── Слой 3: dbt ──────────────────────────────
+    subgraph L3["③ Трансформация — dbt · 02:00 UTC"]
+        STG["staging\n10 моделей · type casts + filters"]
+        INT["intermediate\n4 модели · enrichment + joins\n7.8M → ~71K rows"]
+        MARTS["marts\n10 моделей · business metrics"]
+        STG --> INT --> MARTS
+    end
+
+    %% ── Слой 4: Serving ──────────────────────────
+    subgraph L4["④ Serving Store · 03:00 UTC"]
+        SRVDB[("/serving/flights.duckdb\nREAD marts → WRITE tmp → RENAME")]
+    end
+
+    %% ── Слой 5: Clients ──────────────────────────
+    subgraph L5["⑤ Clients"]
+        API["FastAPI :8000\nDuckDB in-process\n/routes · /airlines · /time-travel"]
+        SS["Superset :8088\nduckdb-engine · 13 чартов"]
+    end
+
+    %% ── Внешний API ──────────────────────────────
+    OM(["Open-Meteo API\nweather · free"])
+
+    %% ── Связи между слоями ───────────────────────
+    W1 -- "DuckLake ATTACH\nhttpfs (Parquet write)" --> PG
+    W1 -- "httpfs write" --> S3
+    W1 -. "HTTP fetch\n01:00 UTC" .-> OM
+
+    PG -- "dbt SELECT" --> STG
+    MARTS -- "materialize" --> PG
+
+    MARTS -- "export_serving_store\n03:00 UTC · atomic rename" --> SRVDB
+
+    SRVDB -- "DuckDB read-only" --> API
+    SRVDB -- "SQLAlchemy\nduckdb:////serving/" --> SS
+
+    API -. "AT SNAPSHOT N\ntime-travel" .-> PG
+
+    %% ── Стили ────────────────────────────────────
+    class WS,SCHED,REDIS,W1,W2 orch
+    class PG,S3 dl
+    class STG,INT,MARTS dbt
+    class SRVDB serving
+    class API,SS clients
+    class OM ext

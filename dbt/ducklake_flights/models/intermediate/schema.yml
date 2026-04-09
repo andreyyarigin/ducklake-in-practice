@@ -1,0 +1,36 @@
+version: 2
+
+models:
+  - name: int_flights_enriched
+    description: "Рейсы с обогащением: названия аэропортов, городов, авиакомпаний, задержка"
+    columns:
+      - name: flight_id
+        tests: [unique, not_null]
+      - name: flight_date
+        tests: [not_null]
+      - name: delay_minutes
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: -10
+              max_value: 1440
+              where: "delay_minutes is not null"
+
+  - name: int_bookings_enriched
+    description: "Бронирования с денормализованными данными рейса и пассажира"
+    columns:
+      - name: booking_id
+        tests: [unique, not_null]
+      - name: flight_date
+        tests: [not_null]
+      - name: route_key
+        tests: [not_null]
+
+  - name: int_price_curves
+    description: "История цен с бакетами дней до вылета для анализа dynamic pricing"
+    columns:
+      - name: price_id
+        tests: [unique, not_null]
+      - name: days_bucket
+        tests:
+          - accepted_values:
+              values: ["0_day_of", "1_1to6d", "2_7to13d", "3_14to29d", "4_30to59d", "5_60plus"]

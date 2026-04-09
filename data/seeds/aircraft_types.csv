@@ -1,0 +1,18 @@
+icao_code,iata_code,manufacturer,model,family,seats_economy,seats_business,seats_first,seats_total,range_km,fuel_burn_kg_per_km,first_flight_year,engine_type,body_type
+A320,320,Airbus,A320-200,A320,150,12,0,162,6100,3.0,1987,turbofan,narrowbody
+A321,321,Airbus,A321-200,A320,165,16,0,181,5950,3.4,1993,turbofan,narrowbody
+A319,319,Airbus,A319-100,A320,120,8,0,128,6850,2.7,1995,turbofan,narrowbody
+A20N,32A,Airbus,A320neo,A320neo,150,12,0,162,6300,2.5,2014,turbofan,narrowbody
+A21N,32B,Airbus,A321neo,A320neo,165,16,0,181,7400,2.8,2016,turbofan,narrowbody
+A332,332,Airbus,A330-200,A330,247,28,8,283,13400,6.5,1992,turbofan,widebody
+A333,333,Airbus,A330-300,A330,277,36,0,313,11750,6.8,1992,turbofan,widebody
+B737,73H,Boeing,737-800,B737NG,162,12,0,174,5765,3.2,1998,turbofan,narrowbody
+B738,738,Boeing,737-800,B737NG,162,12,0,174,5765,3.2,1998,turbofan,narrowbody
+B73W,73W,Boeing,737-700,B737NG,126,12,0,138,6370,2.8,1997,turbofan,narrowbody
+B763,763,Boeing,767-300ER,B767,218,28,0,246,11070,6.2,1986,turbofan,widebody
+B77W,77W,Boeing,777-300ER,B777,365,42,8,415,13650,8.5,1997,turbofan,widebody
+SU95,SU9,Sukhoi,Superjet 100-95B,SSJ100,87,8,0,95,4578,2.2,2008,turbofan,narrowbody
+E170,E70,Embraer,E170,E-Jet,70,4,0,74,3735,1.8,2001,turbofan,narrowbody
+E190,E90,Embraer,E190,E-Jet,98,8,0,106,4537,2.1,2004,turbofan,narrowbody
+AT75,AT7,ATR,ATR 72-500,ATR72,66,0,0,66,1528,0.9,1988,turboprop,narrowbody
+CRJ2,CR2,Bombardier,CRJ-200,CRJ,50,0,0,50,3148,1.2,1991,turbofan,narrowbody

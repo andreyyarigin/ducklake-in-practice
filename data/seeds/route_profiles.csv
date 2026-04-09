@@ -1,0 +1,92 @@
+src_iata,dst_iata,base_load_factor,price_tier,seasonality_type,competition_level,notes
+SVO,LED,0.88,premium,low,high,Москва–Питер: высококонкурентный хаб
+LED,SVO,0.88,premium,low,high,
+SVO,AER,0.72,medium,high_summer,medium,Москва–Сочи: летний курорт
+AER,SVO,0.72,medium,high_summer,medium,
+SVO,SVX,0.70,medium,low,medium,Москва–Екатеринбург
+SVX,SVO,0.70,medium,low,medium,
+SVO,OVB,0.65,medium,low,low,Москва–Новосибирск
+OVB,SVO,0.65,medium,low,low,
+SVO,KZN,0.75,medium,low,medium,Москва–Казань
+KZN,SVO,0.75,medium,low,medium,
+SVO,UFA,0.68,medium,low,medium,Москва–Уфа
+UFA,SVO,0.68,medium,low,medium,
+SVO,ROV,0.70,medium,low,medium,Москва–Ростов
+ROV,SVO,0.70,medium,low,medium,
+SVO,KRR,0.73,medium,high_summer,medium,Москва–Краснодар
+KRR,SVO,0.73,medium,high_summer,medium,
+SVO,VKO,0.60,budget,low,high,Внутримосковские перелёты (техн.)
+VKO,SVO,0.60,budget,low,high,
+DME,LED,0.85,premium,low,high,
+LED,DME,0.85,premium,low,high,
+DME,AER,0.70,medium,high_summer,medium,
+AER,DME,0.70,medium,high_summer,medium,
+DME,SVX,0.68,medium,low,medium,
+SVX,DME,0.68,medium,low,medium,
+DME,KZN,0.72,medium,low,medium,
+KZN,DME,0.72,medium,low,medium,
+DME,OVB,0.63,medium,low,low,
+OVB,DME,0.63,medium,low,low,
+VKO,LED,0.82,premium,low,high,
+LED,VKO,0.82,premium,low,high,
+VKO,AER,0.68,medium,high_summer,medium,
+AER,VKO,0.68,medium,high_summer,medium,
+SVO,VVO,0.60,premium,low,low,Москва–Владивосток: дальний восток
+VVO,SVO,0.60,premium,low,low,
+SVO,IKT,0.55,premium,low,low,Москва–Иркутск
+IKT,SVO,0.55,premium,low,low,
+SVO,KHV,0.58,premium,low,low,Москва–Хабаровск
+KHV,SVO,0.58,premium,low,low,
+SVO,NSK,0.45,premium,low,low,Москва–Норильск: изолированный аэропорт
+NSK,SVO,0.45,premium,low,low,
+SVO,GOJ,0.72,medium,low,medium,Москва–Нижний Новгород
+GOJ,SVO,0.72,medium,low,medium,
+SVO,KUF,0.70,medium,low,medium,Москва–Самара
+KUF,SVO,0.70,medium,low,medium,
+SVO,CEK,0.65,medium,low,medium,Москва–Челябинск
+CEK,SVO,0.65,medium,low,medium,
+LED,AER,0.65,medium,high_summer,medium,Питер–Сочи
+AER,LED,0.65,medium,high_summer,medium,
+LED,SVX,0.62,medium,low,low,
+SVX,LED,0.62,medium,low,low,
+LED,KZN,0.60,medium,low,low,
+KZN,LED,0.60,medium,low,low,
+SVX,OVB,0.65,medium,low,medium,Урал–Сибирь: региональный коридор
+OVB,SVX,0.65,medium,low,medium,
+SVX,KZN,0.62,medium,low,medium,
+KZN,SVX,0.62,medium,low,medium,
+OVB,IKT,0.60,medium,low,low,Сибирь–Иркутск
+IKT,OVB,0.60,medium,low,low,
+OVB,KHV,0.55,medium,low,low,
+KHV,OVB,0.55,medium,low,low,
+KZN,AER,0.62,medium,high_summer,low,Поволжье–Сочи
+AER,KZN,0.62,medium,high_summer,low,
+UFA,AER,0.60,medium,high_summer,low,
+AER,UFA,0.60,medium,high_summer,low,
+ROV,SVX,0.55,medium,low,low,
+SVX,ROV,0.55,medium,low,low,
+SVO,MRV,0.68,medium,high_summer,medium,Москва–Минеральные Воды
+MRV,SVO,0.68,medium,high_summer,medium,
+SVO,AER,0.72,medium,high_summer,medium,
+SVO,NAL,0.60,medium,high_summer,low,Москва–Нальчик
+NAL,SVO,0.60,medium,high_summer,low,
+SVO,IGT,0.58,medium,high_summer,low,Москва–Магас
+IGT,SVO,0.58,medium,high_summer,low,
+SVO,GRV,0.62,medium,low,low,Москва–Грозный
+GRV,SVO,0.62,medium,low,low,
+OVB,TOF,0.72,medium,low,medium,Новосибирск–Томск: региональный
+TOF,OVB,0.72,medium,low,medium,
+SVX,TJM,0.68,medium,low,medium,Екатеринбург–Тюмень
+TJM,SVX,0.68,medium,low,medium,
+SVO,TJM,0.62,medium,low,low,
+TJM,SVO,0.62,medium,low,low,
+SVO,SGC,0.55,medium,low,low,Москва–Сургут
+SGC,SVO,0.55,medium,low,low,
+SVO,NUX,0.50,premium,low,low,Москва–Новый Уренгой: вахта
+NUX,SVO,0.50,premium,low,low,
+SVO,NOJ,0.48,premium,low,low,Москва–Ноябрьск
+NOJ,SVO,0.48,premium,low,low,
+SVX,SGC,0.58,medium,low,low,
+SGC,SVX,0.58,medium,low,low,
+SVX,NUX,0.55,medium,low,low,
+NUX,SVX,0.55,medium,low,low,
