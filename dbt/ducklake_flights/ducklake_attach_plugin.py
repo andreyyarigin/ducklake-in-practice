@@ -13,7 +13,7 @@ class Plugin(BasePlugin):
         pg_db = os.environ.get("DUCKLAKE_PG_DB", "ducklake_catalog")
         pg_user = os.environ.get("DUCKLAKE_PG_USER", "ducklake")
         pg_password = os.environ.get("DUCKLAKE_PG_PASSWORD", "ducklake_secret_change_me")
-        bucket = os.environ.get("RUSTFS_BUCKET", "ducklake-flights")
+        bucket = os.environ.get("MINIO_BUCKET", "ducklake-flights")
 
         # Разрешаем spill на диск при нехватке памяти
         conn.execute("SET memory_limit = '6GB'")

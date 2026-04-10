@@ -1,5 +1,5 @@
 """
-connection.py — фабрика DuckDB-соединения с DuckLake + RustFS.
+connection.py — фабрика DuckDB-соединения с DuckLake + MinIO.
 
 Используется всеми генераторами и скриптами загрузки seed-данных.
 """
@@ -11,15 +11,15 @@ import duckdb
 
 
 def get_ducklake_connection(read_only: bool = False) -> duckdb.DuckDBPyConnection:
-    """Создать DuckDB-соединение с DuckLake через PostgreSQL catalog и RustFS."""
+    """Создать DuckDB-соединение с DuckLake через PostgreSQL catalog и MinIO."""
     pg_host = os.environ.get("DUCKLAKE_PG_HOST", "postgres")
     pg_db = os.environ.get("DUCKLAKE_PG_DB", "ducklake_catalog")
     pg_user = os.environ.get("DUCKLAKE_PG_USER", "ducklake")
     pg_password = os.environ.get("DUCKLAKE_PG_PASSWORD", "ducklake_secret_change_me")
-    s3_key = os.environ.get("RUSTFS_ACCESS_KEY", "rustfsadmin")
-    s3_secret = os.environ.get("RUSTFS_SECRET_KEY", "rustfsadmin123")
-    s3_endpoint = os.environ.get("RUSTFS_ENDPOINT", "http://rustfs:9000")
-    s3_bucket = os.environ.get("RUSTFS_BUCKET", "ducklake-flights")
+    s3_key = os.environ.get("MINIO_ACCESS_KEY", "minioadmin")
+    s3_secret = os.environ.get("MINIO_SECRET_KEY", "minioadmin")
+    s3_endpoint = os.environ.get("MINIO_ENDPOINT", "http://minio:9000")
+    s3_bucket = os.environ.get("MINIO_BUCKET", "ducklake-flights")
 
     # Убираем схему из endpoint для DuckDB
     endpoint_host = (
@@ -34,7 +34,7 @@ def get_ducklake_connection(read_only: bool = False) -> duckdb.DuckDBPyConnectio
         conn.execute(f"INSTALL {ext}; LOAD {ext};")
 
     conn.execute(f"""
-        CREATE SECRET IF NOT EXISTS rustfs_secret (
+        CREATE SECRET IF NOT EXISTS minio_secret (
             TYPE S3,
             KEY_ID '{s3_key}',
             SECRET '{s3_secret}',

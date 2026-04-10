@@ -19,10 +19,10 @@ SERVING_DIR = "/serving"
 DB_PATH = f"{SERVING_DIR}/flights.duckdb"
 DB_PATH_NEW = f"{SERVING_DIR}/flights_new.duckdb"
 
-S3_ENDPOINT = os.environ.get("RUSTFS_ENDPOINT", "http://rustfs:9000").replace("http://", "")
-S3_KEY = os.environ.get("RUSTFS_ACCESS_KEY", "rustfsadmin")
-S3_SECRET = os.environ.get("RUSTFS_SECRET_KEY", "rustfsadmin123")
-S3_BUCKET = os.environ.get("RUSTFS_BUCKET", "ducklake-flights")
+S3_ENDPOINT = os.environ.get("MINIO_ENDPOINT", "http://minio:9000").replace("http://", "")
+S3_KEY = os.environ.get("MINIO_ACCESS_KEY", "minioadmin")
+S3_SECRET = os.environ.get("MINIO_SECRET_KEY", "minioadmin")
+S3_BUCKET = os.environ.get("MINIO_BUCKET", "ducklake-flights")
 PG_HOST = os.environ.get("DUCKLAKE_PG_HOST", "postgres")
 PG_DB = os.environ.get("DUCKLAKE_PG_DB", "ducklake_catalog")
 PG_USER = os.environ.get("DUCKLAKE_PG_USER", "ducklake")

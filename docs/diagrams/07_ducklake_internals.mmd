@@ -1,0 +1,72 @@
+---
+title: ducklake-in-practice — DuckLake Internals
+---
+flowchart TD
+    classDef green fill:#D1FAE5,stroke:#059669,color:#111827
+    classDef orange fill:#FFF7ED,stroke:#D97706,color:#111827
+    classDef purple fill:#F3E8FF,stroke:#7C3AED,color:#111827
+    classDef blue fill:#EFF6FF,stroke:#2563EB,color:#111827
+    classDef red fill:#FFF1F2,stroke:#E11D48,color:#111827
+    classDef yellow fill:#FFFBEB,stroke:#D97706,color:#78350F,font-size:12px
+    classDef db fill:#C7D2FE,stroke:#4338CA,color:#111827
+
+    subgraph WORKER["DuckDB Process (Worker)"]
+        direction TB
+        EXT["Extensions\nducklake.so · postgres.so · httpfs.so"]
+        CONN["ATTACH 'ducklake:postgres:...'\nAS flights\nDATA_PATH = s3://ducklake-flights/"]
+        NOTE_CONN["⚠ Один writer за раз.\nReaders — параллельные (read_only=True).\nthreads: 1 в dbt — обязательно."]:::yellow
+        EXT --> CONN
+    end
+
+    subgraph PG["PostgreSQL :5433 — ducklake_catalog"]
+        direction TB
+        SNAPS["ducklake_snapshot\n(5 373 снэпшотов)"]
+        TABLES["ducklake_table\n(10 таблиц)"]
+        FILES["ducklake_data_file\n(4 898 файлов)"]
+        META["ducklake_column\nducklake_partition_column\nducklake_file_partition_value"]
+        STATS["ducklake_snapshot_changes\nducklake_table_stats · ducklake_tag"]
+        NOTE_PG["Каталог хранит метаданные о каждом файле:\n• путь в S3\n• партиция (flight_date=YYYY-MM-DD)\n• диапазон значений (min/max)\n• снэпшот создания / удаления\nНет JSON-манифестов как в Iceberg!"]:::yellow
+    end
+
+    subgraph MINIO["MinIO :9000 — s3://ducklake-flights/data/main/"]
+        direction LR
+        PQ1["flights/\nflight_date=2026-01-01/\ndata_abc123.parquet"]:::db
+        PQ2["flights/\nflight_date=2026-01-02/\ndata_def456.parquet"]:::db
+        PQ3["flights/\nflight_date=2026-04-08/\ndata_xyz789.parquet"]:::db
+        BK["bookings/\nflight_date=2026-01-01/\ndata_*.parquet"]:::db
+        WX["weather_observations/\nobservation_date=2026-04-07/\ndata_*.parquet"]:::db
+        NOTE_MINIO["Parquet файлы иммутабельны.\nDELETE = создание новой версии.\nСтарые файлы удаляются через:\nCALL ducklake_cleanup_old_files('flights')"]:::yellow
+    end
+
+    subgraph TT["Time Travel"]
+        TT_SQL["SELECT * FROM flights.mart_route_daily\nAT (VERSION => snapshot_id)\nWHERE route_key = 'SVO-LED'\n\nDuckLake читает ТОЛЬКО файлы,\nкоторые существовали в снэпшоте N.\nНовые файлы игнорируются."]:::yellow
+    end
+
+    subgraph ACID["ACID Multi-Table Transaction"]
+        ACID_SQL["conn.execute('BEGIN')\nconn.execute('INSERT INTO flights.flights ...')   ← таблица 1\nconn.execute('INSERT INTO flights.weather_obs ...')  ← таблица 2\nconn.execute('COMMIT')\n\nПри сбое → ROLLBACK автоматически.\nОба изменения атомарны.\nApache Iceberg: только 1 таблица на транзакцию."]:::yellow
+    end
+
+    subgraph MAINT["Maintenance (03:00 UTC)"]
+        direction LR
+        EXPIRE["ducklake_expire_snapshots\nTIMESTAMP older than 7 days"]
+        COMPACT["ducklake_compact\nmerge small Parquet files"]
+        VACUUM["ducklake_vacuum\nфизически удалить файлы из MinIO"]
+        EXPIRE --> COMPACT --> VACUUM
+    end
+
+    WORKER -- "читает метаданные\n(plan query)" --> PG
+    WORKER -- "читает / пишет\nParquet файлы" --> MINIO
+    FILES -- "хранит пути\nk файлам" --> PQ1
+    FILES -- " " --> PQ2
+    FILES -- " " --> PQ3
+    FILES -- " " --> BK
+    FILES -- " " --> WX
+    MAINT -. "expire + vacuum" .-> MINIO
+    MAINT -. "expire snapshots" .-> PG
+
+    class WORKER green
+    class PG orange
+    class MINIO blue
+    class TT purple
+    class ACID red
+    class MAINT green

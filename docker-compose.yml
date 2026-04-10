@@ -19,10 +19,10 @@ x-airflow-common: &airflow-common
     DUCKLAKE_PG_USER: ${DUCKLAKE_USER:-ducklake}
     DUCKLAKE_PG_PASSWORD: ${DUCKLAKE_PASSWORD:-ducklake_secret_change_me}
     # MinIO S3 (S3-compatible, поддерживает range requests)
-    RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-rustfsadmin}
-    RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:-rustfsadmin123}
-    RUSTFS_ENDPOINT: http://minio:9000
-    RUSTFS_BUCKET: ${RUSTFS_BUCKET:-ducklake-flights}
+    MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+    MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+    MINIO_ENDPOINT: http://minio:9000
+    MINIO_BUCKET: ${MINIO_BUCKET:-ducklake-flights}
     # Data generation
     GEN_FLIGHTS_PER_DAY: ${GEN_FLIGHTS_PER_DAY:-800}
     GEN_BOOKINGS_PER_HOUR: ${GEN_BOOKINGS_PER_HOUR:-150}
@@ -47,15 +47,13 @@ services:
       - "9000:9000"
       - "9001:9001"
     environment:
-      MINIO_ROOT_USER: ${RUSTFS_ACCESS_KEY:-rustfsadmin}
-      MINIO_ROOT_PASSWORD: ${RUSTFS_SECRET_KEY:-rustfsadmin123}
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
     command: server /data --console-address ":9001"
     volumes:
       - minio-data:/data
     networks:
-      ducklake-net:
-        aliases:
-          - rustfs
+      - ducklake-net
     healthcheck:
       test: ["CMD-SHELL", "mc ready local || exit 1"]
       interval: 10s
@@ -103,11 +101,11 @@ services:
     image: minio/mc:latest
     container_name: dl-init-minio
     environment:
-      MC_HOST_local: http://${RUSTFS_ACCESS_KEY:-rustfsadmin}:${RUSTFS_SECRET_KEY:-rustfsadmin123}@minio:9000
+      MC_HOST_local: http://${MINIO_ACCESS_KEY:-minioadmin}:${MINIO_SECRET_KEY:-minioadmin}@minio:9000
     entrypoint: >
       /bin/sh -c "
         until mc ready local 2>/dev/null; do echo 'Waiting for MinIO...'; sleep 2; done;
-        mc mb --ignore-existing local/${RUSTFS_BUCKET:-ducklake-flights};
+        mc mb --ignore-existing local/${MINIO_BUCKET:-ducklake-flights};
         echo 'Bucket ready.';
       "
     networks:
@@ -191,10 +189,10 @@ services:
       DUCKLAKE_PG_DB: ${DUCKLAKE_DB:-ducklake_catalog}
       DUCKLAKE_PG_USER: ${DUCKLAKE_USER:-ducklake}
       DUCKLAKE_PG_PASSWORD: ${DUCKLAKE_PASSWORD:-ducklake_secret_change_me}
-      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-rustfsadmin}
-      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:-rustfsadmin123}
-      RUSTFS_ENDPOINT: http://minio:9000
-      RUSTFS_BUCKET: ${RUSTFS_BUCKET:-ducklake-flights}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_BUCKET: ${MINIO_BUCKET:-ducklake-flights}
       API_HOST: "0.0.0.0"
       API_PORT: "8000"
     volumes:
@@ -223,10 +221,10 @@ services:
     container_name: dl-init-serving-store
     command: python /opt/ducklake-in-practice/docker/export-serving-store.py
     environment:
-      RUSTFS_ENDPOINT: http://minio:9000
-      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-rustfsadmin}
-      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:-rustfsadmin123}
-      RUSTFS_BUCKET: ${RUSTFS_BUCKET:-ducklake-flights}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-ducklake-flights}
       DUCKLAKE_PG_HOST: postgres
       DUCKLAKE_PG_DB: ${DUCKLAKE_DB:-ducklake_catalog}
       DUCKLAKE_PG_USER: ${DUCKLAKE_USER:-ducklake}

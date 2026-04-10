@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-healthcheck.py — проверка подключения DuckDB → DuckLake → RustFS.
+healthcheck.py — проверка подключения DuckDB → DuckLake → MinIO.
 
 Выполнить внутри airflow-worker:
     docker compose exec airflow-worker python /opt/ducklake-in-practice/scripts/healthcheck.py
@@ -24,10 +24,10 @@ def main() -> None:
     pg_db = get_env("DUCKLAKE_PG_DB", "ducklake_catalog")
     pg_user = get_env("DUCKLAKE_PG_USER", "ducklake")
     pg_password = get_env("DUCKLAKE_PG_PASSWORD", "ducklake_secret_change_me")
-    s3_key = get_env("RUSTFS_ACCESS_KEY", "rustfsadmin")
-    s3_secret = get_env("RUSTFS_SECRET_KEY", "rustfsadmin123")
-    s3_endpoint = get_env("RUSTFS_ENDPOINT", "http://rustfs:9000")
-    s3_bucket = get_env("RUSTFS_BUCKET", "ducklake-flights")
+    s3_key = get_env("MINIO_ACCESS_KEY", "minioadmin")
+    s3_secret = get_env("MINIO_SECRET_KEY", "minioadmin")
+    s3_endpoint = get_env("MINIO_ENDPOINT", "http://minio:9000")
+    s3_bucket = get_env("MINIO_BUCKET", "ducklake-flights")
 
     print("Connecting to DuckDB...")
     conn = duckdb.connect()
@@ -38,7 +38,7 @@ def main() -> None:
 
     print("Configuring S3 secret...")
     conn.execute(f"""
-        CREATE SECRET IF NOT EXISTS rustfs_secret (
+        CREATE SECRET IF NOT EXISTS minio_secret (
             TYPE S3,
             KEY_ID '{s3_key}',
             SECRET '{s3_secret}',
@@ -68,7 +68,7 @@ def main() -> None:
     print()
     print("DuckLake connection OK")
     print(f"  PostgreSQL:  {pg_host}:{pg_db}")
-    print(f"  RustFS:      {s3_endpoint}/{s3_bucket}")
+    print(f"  MinIO:      {s3_endpoint}/{s3_bucket}")
     print("All checks passed.")
 
 

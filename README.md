@@ -1,31 +1,31 @@
 # ducklake-in-practice
 
+![DuckLake Air Traffic Control](docs/cover.webp)
+
 **Production-grade lakehouse sandbox на DuckDB + DuckLake**
 
 Аналитическая платформа авиабронирований внутренних рейсов РФ, демонстрирующая возможности и ограничения экосистемы DuckDB для построения полноценного lakehouse.
 
-## Цель проекта
+## О проекте
 
-Ответить на вопрос: **как выглядит взрослый lakehouse, построенный на экосистеме DuckDB?**
+Исследование возможностей и ограничений DuckLake — нового lakehouse-формата от команды DuckDB.
 
-Проект намеренно использует production-паттерны при небольшом объёме данных. Архитектурные решения принимаются так, как если бы данных было на порядки больше. Все ограничения и обходные пути задокументированы честно.
+Полный аналитический стек на синтетических данных внутренних авиарейсов РФ: от ingestion и dbt-трансформаций до BI-дашбордов и REST API. ACID-транзакции, time travel, schema evolution — всё на реальных примерах. Все подводные камни задокументированы.
 
 ## Что внутри
 
-- **~76 800 рейсов**, **~7.8M бронирований**, **~219 000 записей истории цен** на синтетических данных внутренних рейсов РФ
-- Полный lakehouse-стек: ingestion → staging → intermediate → marts → serving
-- Задокументированные подводные камни DuckLake первого запуска
+- Синтетические данные внутренних рейсов РФ: рейсы, бронирования, история цен, погода
+- Полный lakehouse-стек: ingestion → staging → enrichment → marts → serving
 
 ## Стек
 
 | Компонент | Технология | Роль |
 |-----------|-----------|------|
-| Object storage | MinIO (alias: rustfs) | S3-совместимое хранилище Parquet-файлов |
+| Object storage | MinIO | S3-совместимое хранилище Parquet-файлов |
 | Metadata catalog | PostgreSQL | Каталог DuckLake + метаданные Airflow + Superset appdb |
 | Lakehouse format | DuckLake | ACID, time travel, schema evolution, partitioning |
 | Compute engine | DuckDB | Запись, трансформации, чтение — in-process |
-| Orchestration | Airflow (CeleryExecutor) | DAGs для ingestion, трансформаций и экспорта |
-| Message broker | Redis | Broker для Celery |
+| Orchestration | Airflow | Оркестрация ingestion, трансформаций и экспорта |
 | Transformations | dbt (dbt-duckdb) | staging → intermediate → marts |
 | BI | Apache Superset | Дашборды поверх serving store |
 | API | FastAPI | REST-аналитика + time travel демо |
@@ -52,7 +52,7 @@ docker compose exec airflow-worker-1 \
 | Airflow | http://localhost:8080 | admin / admin |
 | Superset | http://localhost:8088 | admin / admin |
 | FastAPI docs | http://localhost:8000/docs | — |
-| MinIO Console | http://localhost:9001 | rustfsadmin / rustfsadmin123 |
+| MinIO Console | http://localhost:9001 | minioadmin / minioadmin |
 | PostgreSQL | localhost:5433 | ducklake / (см. .env) |
 
 ## Документация

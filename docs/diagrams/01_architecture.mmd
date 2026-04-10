@@ -21,7 +21,7 @@ flowchart TD
     %% ── Слой 2: DuckLake ─────────────────────────
     subgraph L2["② DuckLake — Source of Truth"]
         PG["PostgreSQL :5433\nducklake_catalog · airflow_metadata · superset_appdb"]
-        S3["MinIO / rustfs :9000\ns3://ducklake-flights/ · Parquet · ~500 MB/day"]
+        S3["MinIO :9000\ns3://ducklake-flights/ · Parquet · ~500 MB/day"]
     end
 
     %% ── Слой 3: dbt ──────────────────────────────

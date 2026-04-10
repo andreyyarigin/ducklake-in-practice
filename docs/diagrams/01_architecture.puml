@@ -37,7 +37,7 @@ title <b>ducklake-in-practice — Архитектура (слои)</b>
 +++[#C7D2FE] Celery Worker 2\ningest bookings (parallel)
 ++[#EA580C] [2] DuckLake — Source of Truth\nParquet + PostgreSQL каталог
 +++[#FED7AA] PostgreSQL :5433\nducklake_catalog\nairflow_metadata · superset_appdb
-+++[#FED7AA] MinIO / rustfs :9000\ns3://ducklake-flights/\nParquet · partition: flight_date\n~500 MB/day
++++[#FED7AA] MinIO :9000\ns3://ducklake-flights/\nParquet · partition: flight_date\n~500 MB/day
 ++[#16A34A] [3] Трансформация — dbt\n02:00 UTC · dbt-duckdb + is_ducklake: true
 +++[#86EFAC] staging · 10 моделей\ntype casts + dedup + filters
 +++[#86EFAC] intermediate · 4 модели\nenrichment + joins · 7.8M → 71K

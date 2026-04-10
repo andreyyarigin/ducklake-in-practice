@@ -14,9 +14,9 @@ ducklake-in-practice:
       plugins:
         - module: ducklake_attach_plugin
       settings:
-        s3_endpoint: "{{ env_var('RUSTFS_ENDPOINT', 'rustfs:9000') | replace('http://', '') }}"
-        s3_access_key_id: "{{ env_var('RUSTFS_ACCESS_KEY', 'rustfsadmin') }}"
-        s3_secret_access_key: "{{ env_var('RUSTFS_SECRET_KEY', 'rustfsadmin123') }}"
+        s3_endpoint: "{{ env_var('MINIO_ENDPOINT', 'minio:9000') | replace('http://', '') }}"
+        s3_access_key_id: "{{ env_var('MINIO_ACCESS_KEY', 'minioadmin') }}"
+        s3_secret_access_key: "{{ env_var('MINIO_SECRET_KEY', 'minioadmin') }}"
         s3_use_ssl: false
         s3_url_style: path
         memory_limit: "6GB"

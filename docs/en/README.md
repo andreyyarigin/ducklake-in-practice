@@ -20,7 +20,7 @@ The project intentionally applies production patterns to a small data volume (~5
 
 | Component | Technology | Role |
 |-----------|-----------|------|
-| Object storage | MinIO (rustfs alias) | S3-compatible Parquet file storage |
+| Object storage | MinIO | S3-compatible Parquet file storage |
 | Metadata catalog | PostgreSQL | DuckLake catalog + Airflow metadata + Superset appdb |
 | Lakehouse format | DuckLake | ACID, time travel, schema evolution, partitioning |
 | Compute engine | DuckDB | Write, transform, read — in-process |
@@ -82,7 +82,7 @@ docker compose exec airflow-worker-1 \
 | Airflow | http://localhost:8080 | admin / admin |
 | FastAPI docs | http://localhost:8000/docs | — |
 | Superset | http://localhost:8088 | admin / admin |
-| MinIO console | http://localhost:9001 | rustfsadmin / rustfsadmin123 |
+| MinIO console | http://localhost:9001 | minioadmin / minioadmin |
 | PostgreSQL | localhost:5433 | ducklake / (see .env) |
 
 ## Documentation

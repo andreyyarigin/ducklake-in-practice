@@ -1,14 +1,14 @@
 #!/bin/sh
-# init-rustfs.sh — создание бакетов в RustFS через AWS CLI.
-# Запускается однократно сервисом init-rustfs в docker-compose.
+# init-minio.sh — создание бакетов в MinIO через AWS CLI.
+# Запускается однократно сервисом init-minio в docker-compose.
 
-ENDPOINT="http://rustfs:9000"
-BUCKET="${RUSTFS_BUCKET:-ducklake-flights}"
+ENDPOINT="http://minio:9000"
+BUCKET="${MINIO_BUCKET:-ducklake-flights}"
 
-echo "Waiting for RustFS to be ready..."
+echo "Waiting for MinIO to be ready..."
 for i in $(seq 1 30); do
     if curl -sf "$ENDPOINT/minio/health/live" > /dev/null 2>&1; then
-        echo "RustFS is ready."
+        echo "MinIO is ready."
         break
     fi
     echo "  attempt $i/30..."
@@ -23,4 +23,4 @@ aws --endpoint-url "$ENDPOINT" s3 mb "s3://$BUCKET" 2>/dev/null && \
 echo "Verifying bucket list:"
 aws --endpoint-url "$ENDPOINT" s3 ls
 
-echo "RustFS init complete."
+echo "MinIO init complete."

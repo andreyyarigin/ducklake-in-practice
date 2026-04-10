@@ -50,9 +50,9 @@ ducklake-in-practice:
         - module: ducklake_attach_plugin
       extensions: [ducklake, postgres, httpfs]
       settings:
-        s3_endpoint: "rustfs:9000"
-        s3_access_key_id: "${RUSTFS_ACCESS_KEY}"
-        s3_secret_access_key: "${RUSTFS_SECRET_KEY}"
+        s3_endpoint: "minio:9000"
+        s3_access_key_id: "${MINIO_ACCESS_KEY}"
+        s3_secret_access_key: "${MINIO_SECRET_KEY}"
         s3_use_ssl: false
         s3_url_style: "path"
         memory_limit: "6GB"

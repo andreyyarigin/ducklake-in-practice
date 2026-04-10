@@ -26,7 +26,7 @@
   │                  │  └─────────────────────────────────────┘  │    │
   │                  │                                            │    │
   │                  │  ┌─────────────────────────────────────┐  │    │
-  │                  │  │     MinIO / rustfs :9000             │  │    │
+  │                  │  │     MinIO :9000                       │  │    │
   │                  │  │  s3://ducklake-flights/data/         │  │    │
   │                  │  │  (Parquet files, date-partitioned)   │  │    │
   │                  │  └─────────────────────────────────────┘  │    │
@@ -62,9 +62,8 @@
 | superset | apache/superset:4.1.1 | 8088 | BI dashboards (admin/admin) |
 | init-serving-store | (custom) | — | Bootstrap serving store on startup |
 
-> **Note:** the `minio` service has the network alias `rustfs` in Docker Compose.
-> DuckLake stores file paths with the hostname `rustfs:9000`.
-> Do not rename this host or change the alias without recreating all tables.
+> **Note:** DuckLake stores Parquet file paths with the hostname used at write time.
+> All data is written and read through `minio:9000`. Do not rename this host without recreating all tables.
 
 ## Data Flow
 
@@ -220,21 +219,19 @@ dbt run --select marts
 
 The `int_bookings_daily_agg` model pre-aggregates 7.8M bookings → ~71K rows before mart joins.
 
-### 6. MinIO: rustfs network alias is required
+### 6. MinIO hostname is bound at table creation time
 
-**Problem:** DuckLake stores Parquet file paths in the PostgreSQL catalog using the hostname from the time of writing. If data was written through `rustfs:9000`, it will always be read through `rustfs:9000`.
+**Problem:** DuckLake stores Parquet file paths in the PostgreSQL catalog using the hostname from the time of writing. If data was written through `minio:9000`, it will always be read through `minio:9000`.
 
-**Fix:** the MinIO service in Docker Compose has the alias `rustfs`. Never change this alias or rename the host without recreating all tables.
+**Fix:** use `minio` as the hostname consistently. The DuckDB secret and `ATTACH` statement both reference `minio:9000` directly. If the hostname ever needs to change, all DuckLake tables must be recreated from scratch.
 
-```yaml
-# docker-compose.yml
-services:
-  minio:
-    image: minio/minio
-    networks:
-      default:
-        aliases:
-          - rustfs
+```python
+conn.execute("""
+    CREATE SECRET IF NOT EXISTS minio_secret (
+        TYPE S3, KEY_ID 'minioadmin', SECRET 'minioadmin',
+        ENDPOINT 'minio:9000', URL_STYLE 'path', USE_SSL false
+    )
+""")
 ```
 
 ### 7. Serving store: atomic export of mart tables

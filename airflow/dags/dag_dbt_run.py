@@ -39,8 +39,8 @@ def _run_dbt(command: list[str], **context) -> None:
 
     env = os.environ.copy()
     env.setdefault("DUCKLAKE_PASSWORD", "ducklake_secret_change_me")
-    env.setdefault("RUSTFS_ACCESS_KEY", "rustfsadmin")
-    env.setdefault("RUSTFS_SECRET_KEY", "rustfsadmin123")
+    env.setdefault("MINIO_ACCESS_KEY", "minioadmin")
+    env.setdefault("MINIO_SECRET_KEY", "minioadmin")
 
     full_cmd = [
         "dbt",

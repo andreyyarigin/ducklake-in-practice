@@ -41,7 +41,7 @@ On first run, Docker downloads images (~3–5 GB) and builds custom Dockerfiles.
 
 | Service | Container | Role |
 |---|---|---|
-| MinIO (rustfs) | `dl-minio` | S3-compatible Parquet storage |
+| MinIO | `dl-minio` | S3-compatible Parquet storage |
 | PostgreSQL | `dl-postgres` | DuckLake catalog + Airflow metadata + Superset appdb |
 | Redis | `dl-redis` | Celery broker for Airflow |
 | Airflow Webserver | `dl-airflow-webserver` | UI + REST API |
@@ -167,7 +167,7 @@ docker compose exec airflow-worker-1 \
 | Airflow | http://localhost:8080 | `admin` / `admin` |
 | FastAPI Swagger | http://localhost:8000/docs | — |
 | Superset | http://localhost:8088 | `admin` / `admin` |
-| MinIO Console | http://localhost:9001 | `rustfsadmin` / `rustfsadmin123` |
+| MinIO Console | http://localhost:9001 | `minioadmin` / `minioadmin` |
 
 ### Superset: open the dashboard
 

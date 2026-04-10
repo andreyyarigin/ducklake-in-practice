@@ -14,10 +14,10 @@ class Settings:
     pg_user: str = os.environ.get("DUCKLAKE_PG_USER", "ducklake")
     pg_password: str = os.environ.get("DUCKLAKE_PG_PASSWORD", "ducklake_secret_change_me")
 
-    s3_key: str = os.environ.get("RUSTFS_ACCESS_KEY", "rustfsadmin")
-    s3_secret: str = os.environ.get("RUSTFS_SECRET_KEY", "rustfsadmin123")
-    s3_endpoint: str = os.environ.get("RUSTFS_ENDPOINT", "http://rustfs:9000")
-    s3_bucket: str = os.environ.get("RUSTFS_BUCKET", "ducklake-flights")
+    s3_key: str = os.environ.get("MINIO_ACCESS_KEY", "minioadmin")
+    s3_secret: str = os.environ.get("MINIO_SECRET_KEY", "minioadmin")
+    s3_endpoint: str = os.environ.get("MINIO_ENDPOINT", "http://minio:9000")
+    s3_bucket: str = os.environ.get("MINIO_BUCKET", "ducklake-flights")
 
     api_host: str = os.environ.get("API_HOST", "0.0.0.0")
     api_port: int = int(os.environ.get("API_PORT", "8000"))

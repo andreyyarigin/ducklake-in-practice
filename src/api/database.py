@@ -36,7 +36,7 @@ class DuckLakePool:
             conn.execute(f"INSTALL {ext}; LOAD {ext};")
 
         conn.execute(f"""
-            CREATE SECRET IF NOT EXISTS rustfs_secret (
+            CREATE SECRET IF NOT EXISTS minio_secret (
                 TYPE S3,
                 KEY_ID '{settings.s3_key}',
                 SECRET '{settings.s3_secret}',

@@ -60,7 +60,7 @@ MotherDuck is a server-based DuckDB with concurrent access. Data stays in DuckLa
 ```sql
 -- ClickHouse reads Parquet from MinIO directly
 CREATE TABLE mart_route_daily
-ENGINE = S3('http://rustfs:9000/ducklake-flights/data/main/mart_route_daily/*.parquet', 'Parquet')
+ENGINE = S3('http://minio:9000/ducklake-flights/data/main/mart_route_daily/*.parquet', 'Parquet')
 ```
 
 ClickHouse as the serving layer. DuckLake remains the source of truth. Superset connects to ClickHouse. Scales horizontally.

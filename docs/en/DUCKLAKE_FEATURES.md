@@ -191,7 +191,7 @@ if departure.tzinfo is None:
 
 ### MinIO hostname in file paths is locked at table creation time
 
-DuckLake writes absolute Parquet file paths to the PostgreSQL catalog when a table is created. If a table was created with `rustfs:9000`, all files are only accessible through that hostname. Changing the hostname means fully recreating the tables.
+DuckLake writes absolute Parquet file paths to the PostgreSQL catalog when a table is created. If a table was created with `minio:9000`, all files are only accessible through that hostname. Changing the hostname means fully recreating the tables.
 
 ### Serving store is the right pattern for BI
 
