@@ -1,6 +1,6 @@
 # ducklake-in-practice
 
-![DuckLake Air Traffic Control](docs/cover.webp)
+<img src="docs/cover.webp" width="512" alt="DuckLake Air Traffic Control"/>
 
 **Production-grade lakehouse sandbox на DuckDB + DuckLake**
 
